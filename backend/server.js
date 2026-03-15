@@ -22,7 +22,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Master High-Res v11.0");
+  res.send("SaveStream Backend Running - Universal Sound Fix v12.0");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -34,8 +34,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Back to most resilient multi-client strategy for bypassing blocks
-  let args = [
+  const args = [
     "--dump-single-json",
     "--no-playlist",
     "--no-warnings",
@@ -43,14 +42,11 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--extractor-args", "youtube:player_client=android_vr,ios,web,mweb,android;player_skip=configs",
-    "--add-header", "Accept-Language:en-US,en;q=0.9",
+    "--extractor-args", "youtube:player_client=android,web,ios;player_skip=configs",
     url
   ];
 
-  console.log(`[MASTER INFO] Deep Extraction: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
-  
   let stdoutData = "";
   let stderrData = "";
   const timeout = setTimeout(() => { ytdlp.kill(); }, 60000);
@@ -61,15 +57,7 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      const errorStr = stderrData.trim();
-      console.error(`[ERROR] yt-dlp failed:`, errorStr);
-      
-      let userError = "Analysis Failed";
-      if (errorStr.includes("confirm you're not a bot")) userError = "Analysis Failed: Platform protected (Bot detected). Please try again in a few minutes.";
-      else if (errorStr.includes("This video is unavailable")) userError = "Analysis Failed: Video is restricted or unavailable.";
-      else userError = `Analysis Failed: ${errorStr.split('\n')[0].substring(0, 120)}`;
-
-      return res.status(500).json({ error: userError });
+      return res.status(500).json({ error: "Analysis Failed: Please try again." });
     }
 
     try {
@@ -78,13 +66,11 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
-      // Sort raw formats by quality metrics
       rawFormats.sort((a, b) => (b.tbr || b.filesize || 0) - (a.tbr || a.filesize || 0));
 
       rawFormats.forEach(f => {
         if (!f.vcodec || f.vcodec === 'none') return; 
         
-        // Smart Logic for Vertical and Horizontal videos
         const w = f.width || 0;
         const h = f.height || 0;
         const resValue = Math.min(w, h) || h || w;
@@ -99,7 +85,7 @@ app.post('/api/info', async (req, res) => {
             format_id: f.format_id,
             ext: 'mp4',
             size: f.filesize || f.filesize_approx || 0,
-            hasAudio: f.acodec !== 'none' || f.audio_ext !== 'none'
+            hasAudio: true // We can always merge audio now
           });
         }
       });
@@ -125,7 +111,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Could not process high-resolution signals." });
+      res.status(500).json({ error: "Analysis Failed: Data error." });
     }
   });
 });
@@ -134,6 +120,7 @@ app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudioOnly = ext === 'mp3';
   
+  // Force AAC audio during merge for 100% compatibility across all players
   const formatArg = isAudioOnly 
     ? "bestaudio/best" 
     : (format_id && format_id !== 'best' 
@@ -144,12 +131,23 @@ app.get('/api/download', (req, res) => {
   
   const args = isAudioOnly 
     ? ["-f", formatArg, "--extract-audio", "--audio-format", "mp3", "--no-check-certificate", "-o", tempFilePath, url]
-    : ["-f", formatArg, "--merge-output-format", "mp4", "--remux-video", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
+    : [
+        "-f", formatArg, 
+        "--merge-output-format", "mp4", 
+        "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k", // THE FIX: Forces sound into AAC
+        "--no-check-certificate", 
+        "-o", tempFilePath, 
+        url
+      ];
 
+  console.log(`[DOWNLOAD] Sound-Safe Mode: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
+
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    res.download(tempFilePath, `video_${crypto.randomUUID()}.${ext}`, () => {
+    
+    const finalName = isAudioOnly ? 'SaveStream_Audio.mp3' : 'SaveStream_Video.mp4';
+    res.download(tempFilePath, finalName, (err) => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
