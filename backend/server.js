@@ -40,7 +40,8 @@ app.get("/", (req, res) => {
 
 // Health check to verify yt-dlp version
 app.get("/api/health", (req, res) => {
-  const ytdlp = spawn("yt-dlp", ["--version"]);
+  const YTDLP_PATH = '/usr/local/bin/yt-dlp';
+  const ytdlp = spawn(YTDLP_PATH, ["--version"]);
   let output = "";
   ytdlp.stdout.on("data", (d) => output += d.toString());
   ytdlp.on("close", (code) => {
@@ -79,9 +80,10 @@ app.post('/api/info', async (req, res) => {
     url
   ];
 
-  console.log(`[INFO] Analyzing: ${url}`);
+  const YTDLP_PATH = '/usr/local/bin/yt-dlp';
+  console.log(`[INFO] Spawning: ${YTDLP_PATH} ${args.join(' ')}`);
 
-  const ytdlp = spawn("yt-dlp", args);
+  const ytdlp = spawn(YTDLP_PATH, args);
 
   let stdoutData = "";
   let stderrData = "";
@@ -200,7 +202,8 @@ app.get('/api/download', (req, res) => {
         : ["-f", formatArg, "--merge-output-format", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
 
       console.log(`[DOWNLOAD] Starting: ${url}`);
-      const ytdlpDownload = spawn("yt-dlp", args);
+      const YTDLP_PATH = '/usr/local/bin/yt-dlp';
+      const ytdlpDownload = spawn(YTDLP_PATH, args);
 
       ytdlpDownload.on("close", (code) => {
         if (code !== 0) {
