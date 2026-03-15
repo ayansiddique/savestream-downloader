@@ -533,42 +533,77 @@ footer {
 @media (max-width: 768px) {
   .navbar {
     padding: 1rem 1.25rem;
-    flex-direction: row; /* Keeps logo left, toggle right */
+    flex-wrap: wrap; /* Allow wrapping for links */
     justify-content: space-between;
+    gap: 1rem;
   }
   
   .nav-links {
-    display: none; /* Hide standard links to clean up mobile header */
+    display: flex; /* Restore links */
+    width: 100%;
+    order: 3; /* Push links below logo/toggle */
+    justify-content: flex-start;
+    gap: 1.25rem;
+    overflow-x: auto; /* Horizontal scroll if too many */
+    white-space: nowrap;
+    padding: 0.5rem 0;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
+  
+  .nav-links::-webkit-scrollbar { display: none; }
 
   .logo { font-size: 1.3rem; }
   
-  .hero { margin-top: 4rem; margin-bottom: 3rem; }
-  .hero h1 { font-size: 2.5rem; }
+  .hero { margin-top: 2rem; margin-bottom: 2rem; }
+  .hero h1 { font-size: 2.25rem; }
 
   .downloader-card { 
-    padding: 2rem 1.25rem;
+    padding: 1.5rem 1.25rem;
     background: var(--card-bg);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--card-border);
+    gap: 1.25rem;
   }
 
-  .video-info { margin-top: 2.5rem; }
-  .video-header { gap: 1rem; }
-  
-  .quality-card {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+  .input-group {
+    flex-direction: column; /* THE FIX: Vertical stack buttons */
+    gap: 0.75rem;
   }
-  
+
+  .url-input {
+    width: 100%;
+    padding: 1.1rem;
+    font-size: 1rem;
+  }
+
   .fetch-btn {
-    height: 60px;
+    width: 100%; /* THE FIX: Full width on mobile */
+    height: 56px;
+    justify-content: center;
+    padding: 0;
     font-size: 1.1rem;
   }
+
+  .video-info { margin-top: 2rem; }
+  .video-header { 
+    flex-direction: column; 
+    align-items: center; 
+    text-align: center;
+    gap: 1.25rem; 
+  }
+  
+  .thumbnail-container { width: 100%; max-width: 300px; }
+  .video-title { font-size: 1.1rem; flex-direction: column-reverse; }
+
+  .quality-list { grid-template-columns: 1fr; }
+  .quality-card { padding: 1.25rem; }
 }
 
 @media (max-width: 480px) {
-  .hero h1 { font-size: 2rem; }
-  .hero p { font-size: 0.95rem; }
+  .hero h1 { font-size: 1.85rem; }
+  .hero p { font-size: 0.9rem; }
   .logo { font-size: 1.2rem; }
-  .navbar { padding: 0.85rem 1rem; }
+  .navbar { padding: 0.75rem 1rem; }
+  .nav-links { gap: 1rem; }
+  .nav-link { font-size: 0.85rem; }
 }
