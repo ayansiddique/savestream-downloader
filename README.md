@@ -106,3 +106,5 @@ If you prefer, you can use `.env` files for the frontend instead of hardcoding `
    `VITE_API_BASE=https://my-backend.onrender.com/api`
 2. Update `App.jsx` to use:
    `const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';`
+
+Deployment test update
