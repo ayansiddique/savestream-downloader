@@ -59,6 +59,9 @@ app.post('/api/info', async (req, res) => {
       noCallHome: true,
       noCheckCertificate: true,
       youtubeSkipDashManifest: true,
+      noPlaylist: true,
+      quiet: true,
+      forceIpv4: true, // Often faster in data centers
     });
 
     // Formatting qualities available

@@ -1,9 +1,13 @@
-FROM node:20
+FROM node:20-slim
 
+# Install system dependencies including python and ffmpeg
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip ffmpeg && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    pip install yt-dlp --break-system-packages
+    apt-get install -y python3 python3-pip ffmpeg curl && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+# Install latest yt-dlp globally
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /app
 
