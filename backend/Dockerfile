@@ -1,21 +1,22 @@
-FROM node:20-bullseye
+FROM node:20
 
-# Install ffmpeg and python
+# Install Python, Pip, and FFmpeg
 RUN apt-get update && \
-    apt-get install -y ffmpeg python3 curl && \
+    apt-get install -y python3 python3-pip ffmpeg curl && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-WORKDIR /app
+# Install latest yt-dlp via pip3 (most reliable for Railway Linux)
+# Using --break-system-packages for modern Debian/Node images
+RUN pip3 install --no-cache-dir -U yt-dlp --break-system-packages
 
-# Download yt-dlp into the app directory directly
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /app/yt-dlp && \
-    chmod 777 /app/yt-dlp
+WORKDIR /app
 
 COPY package*.json ./
 RUN npm install
 
 COPY . .
 
+# Expose port 8080 (Railway will map the dynamic port here)
 EXPOSE 8080
 
 CMD ["node", "server.js"]
