@@ -204,6 +204,10 @@ app.get('/api/download', (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.send("SaveStream Backend Running");
+});
+
 app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
