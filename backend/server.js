@@ -7,7 +7,7 @@ const { exec } = require('child_process');
 const ytdlp = require('yt-dlp-exec');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Enable trust proxy for platforms like Railway/Render
 app.set('trust proxy', 1);
@@ -27,7 +27,11 @@ const processQueue = () => {
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
+}));
 app.use(express.json());
 
 // Rate Limiting
@@ -37,6 +41,11 @@ const apiLimiter = rateLimit({
   message: 'Too many requests from this IP, please try again after 15 minutes',
 });
 app.use('/api/', apiLimiter);
+
+// Health Check / Root route
+app.get("/", (req, res) => {
+  res.send("SaveStream Backend Running");
+});
 
 // Endpoint: Fetch video metadata
 app.post('/api/info', async (req, res) => {
@@ -152,11 +161,6 @@ app.get('/api/download', (req, res) => {
       }
     };
 
-    req.on('close', () => {
-       // if client disconnects early we can't easily kill yt-dlp through the basic promise wrapper 
-       // without keeping the child process ref, but we will clean up afterwards.
-    });
-
     try {
       res.header('Content-Disposition', `attachment; filename="download.${ext}"`);
       res.header('Content-Type', isAudioOnly ? 'audio/mpeg' : 'video/mp4');
@@ -199,16 +203,10 @@ app.get('/api/download', (req, res) => {
   // Queue logic
   if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
     downloadQueue.push(startDownload);
-    // Note: To implement a real proper progress/status, we'd need SSE.
-    // For now, HTTP request waits until it arrives at the front of the queue, then starts downloading natively over HTTP chunked transfer.
   } else {
     activeDownloads++;
     startDownload();
   }
-});
-
-app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
