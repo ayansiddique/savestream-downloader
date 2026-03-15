@@ -13,9 +13,8 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
-// Clearing cache more frequently for testing
 const infoCache = new Map();
-const CACHE_TTL = 30 * 1000; // 30 seconds only for now
+const CACHE_TTL = 1 * 60 * 1000; // 1 minute cache
 
 const getYTCommand = () => {
     if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
@@ -23,7 +22,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Quality Unlocker v13.0");
+  res.send("SaveStream Backend Running - Permanent HD v14.0");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -35,7 +34,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // The "True" High-Res Clients: tv and web_embedded are currently the best for 1080p+
+  // Stable Multi-Client strategy for stability + high res
   let args = [
     "--dump-single-json",
     "--no-playlist",
@@ -44,17 +43,17 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--extractor-args", "youtube:player_client=tv,web_embedded;player_skip=configs",
-    "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "--extractor-args", "youtube:player_client=ios,web,android;player_skip=configs",
+    "--add-header", "Accept-Language:en-US,en;q=0.9",
     url
   ];
 
-  console.log(`[QUALITY UNLOCK] Fetching Higher Res: ${url}`);
+  console.log(`[HD DISCOVERY] Analyzing: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
   let stderrData = "";
-  const timeout = setTimeout(() => { ytdlp.kill(); }, 60000);
+  const timeout = setTimeout(() => { ytdlp.kill(); }, 55000);
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -62,7 +61,15 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      return res.status(500).json({ error: "Analysis Failed: Linking issue." });
+      const errorMsg = stderrData.trim();
+      console.error(`[ERROR] yt-dlp:`, errorMsg);
+      
+      let userFriendlyError = "Analysis Failed: Platform is blocking the request. Please try again later.";
+      if (errorMsg.includes("confirm you're not a bot")) userFriendlyError = "Analysis Failed: Bot detection triggered. Try a different video.";
+      else if (errorMsg.includes("Unavailable")) userFriendlyError = "Analysis Failed: Video is restricted or unavailable.";
+      else userFriendlyError = `Analysis Failed: ${errorMsg.split('\n')[0].substring(0, 100)}`;
+
+      return res.status(500).json({ error: userFriendlyError });
     }
 
     try {
@@ -71,20 +78,22 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
-      // Sort by vertical resolution and quality metrics
-      rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0) || (b.tbr || 0) - (a.tbr || 0));
+      // Sort formats by vertical height or resolution
+      rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
       rawFormats.forEach(f => {
-        if (!f.vcodec || f.vcodec === 'none') return; 
+        if (!f.vcodec || f.vcodec === 'none') return;
         
-        // Smart Logic for Vertical (Shorts) & Horizontal
-        const w = f.width || 0;
-        const h = f.height || 0;
-        const resValue = Math.min(w, h) || h || w; // Picking the smaller side for label (1080 for vertical 1080x1920)
+        let h = f.height || 0;
+        if (!h && f.resolution) {
+           const parts = f.resolution.split('x');
+           h = parts.length > 1 ? parseInt(parts[1]) : parseInt(parts[0]);
+        }
         
-        if (resValue < 140) return;
+        if (h < 140) return;
         
-        const label = `${resValue}p`;
+        // Logical labeling for Vertical vs Horizontal
+        const label = `${h}p`;
         if (!seenLabels.has(label)) {
           seenLabels.add(label);
           qualities.push({
@@ -92,16 +101,16 @@ app.post('/api/info', async (req, res) => {
             format_id: f.format_id,
             ext: 'mp4',
             size: f.filesize || f.filesize_approx || 0,
-            hasAudio: true // We merge audio during download always
+            hasAudio: true
           });
         }
       });
 
-      // Sort labels: 4K (2160p) > 2K (1440p) > 1080p > 720p ...
+      // Show quality in descending order
       qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
 
-      const audioStreams = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none');
-      const bestAudio = audioStreams.sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0))[0];
+      const bestAudio = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none')
+        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
       const responseData = {
         title: data.title,
@@ -119,7 +128,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: High-res decoding error." });
+      res.status(500).json({ error: "Analysis Failed: Result parsing error." });
     }
   });
 });
@@ -150,7 +159,7 @@ app.get('/api/download', (req, res) => {
   const ytdlp = spawn(getYTCommand(), args);
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    res.download(tempFilePath, `video_${crypto.randomUUID()}.${isAudioOnly ? 'mp3' : 'mp4'}`, () => {
+    res.download(tempFilePath, `video_${crypto.randomUUID()}.${ext}`, () => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
