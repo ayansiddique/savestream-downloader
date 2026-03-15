@@ -13,8 +13,9 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
+// Clearing cache more frequently for testing
 const infoCache = new Map();
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 30 * 1000; // 30 seconds only for now
 
 const getYTCommand = () => {
     if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
@@ -22,7 +23,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Universal Sound Fix v12.0");
+  res.send("SaveStream Backend Running - Quality Unlocker v13.0");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -34,7 +35,8 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  const args = [
+  // The "True" High-Res Clients: tv and web_embedded are currently the best for 1080p+
+  let args = [
     "--dump-single-json",
     "--no-playlist",
     "--no-warnings",
@@ -42,11 +44,14 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--extractor-args", "youtube:player_client=android,web,ios;player_skip=configs",
+    "--extractor-args", "youtube:player_client=tv,web_embedded;player_skip=configs",
+    "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
     url
   ];
 
+  console.log(`[QUALITY UNLOCK] Fetching Higher Res: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
+  
   let stdoutData = "";
   let stderrData = "";
   const timeout = setTimeout(() => { ytdlp.kill(); }, 60000);
@@ -57,7 +62,7 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      return res.status(500).json({ error: "Analysis Failed: Please try again." });
+      return res.status(500).json({ error: "Analysis Failed: Linking issue." });
     }
 
     try {
@@ -66,14 +71,16 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
-      rawFormats.sort((a, b) => (b.tbr || b.filesize || 0) - (a.tbr || a.filesize || 0));
+      // Sort by vertical resolution and quality metrics
+      rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0) || (b.tbr || 0) - (a.tbr || 0));
 
       rawFormats.forEach(f => {
         if (!f.vcodec || f.vcodec === 'none') return; 
         
+        // Smart Logic for Vertical (Shorts) & Horizontal
         const w = f.width || 0;
         const h = f.height || 0;
-        const resValue = Math.min(w, h) || h || w;
+        const resValue = Math.min(w, h) || h || w; // Picking the smaller side for label (1080 for vertical 1080x1920)
         
         if (resValue < 140) return;
         
@@ -85,11 +92,12 @@ app.post('/api/info', async (req, res) => {
             format_id: f.format_id,
             ext: 'mp4',
             size: f.filesize || f.filesize_approx || 0,
-            hasAudio: true // We can always merge audio now
+            hasAudio: true // We merge audio during download always
           });
         }
       });
 
+      // Sort labels: 4K (2160p) > 2K (1440p) > 1080p > 720p ...
       qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
 
       const audioStreams = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none');
@@ -100,7 +108,7 @@ app.post('/api/info', async (req, res) => {
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
-        formats: qualities.slice(0, 15),
+        formats: qualities.slice(0, 12),
         audio: { 
             format_id: bestAudio ? bestAudio.format_id : 'bestaudio', 
             ext: 'mp3', 
@@ -111,7 +119,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Data error." });
+      res.status(500).json({ error: "Analysis Failed: High-res decoding error." });
     }
   });
 });
@@ -120,7 +128,6 @@ app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudioOnly = ext === 'mp3';
   
-  // Force AAC audio during merge for 100% compatibility across all players
   const formatArg = isAudioOnly 
     ? "bestaudio/best" 
     : (format_id && format_id !== 'best' 
@@ -134,20 +141,16 @@ app.get('/api/download', (req, res) => {
     : [
         "-f", formatArg, 
         "--merge-output-format", "mp4", 
-        "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k", // THE FIX: Forces sound into AAC
+        "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k", 
         "--no-check-certificate", 
         "-o", tempFilePath, 
         url
       ];
 
-  console.log(`[DOWNLOAD] Sound-Safe Mode: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
-
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    
-    const finalName = isAudioOnly ? 'SaveStream_Audio.mp3' : 'SaveStream_Video.mp4';
-    res.download(tempFilePath, finalName, (err) => {
+    res.download(tempFilePath, `video_${crypto.randomUUID()}.${isAudioOnly ? 'mp3' : 'mp4'}`, () => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
