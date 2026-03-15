@@ -35,7 +35,22 @@ const isValidUrl = (url) => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running");
+  res.send("SaveStream Backend Running - v2.1");
+});
+
+// Health check to verify yt-dlp version
+app.get("/api/health", (req, res) => {
+  const ytdlp = spawn("yt-dlp", ["--version"]);
+  let output = "";
+  ytdlp.stdout.on("data", (d) => output += d.toString());
+  ytdlp.on("close", (code) => {
+    res.json({
+      status: code === 0 ? "ready" : "error",
+      version: output.trim(),
+      port: PORT,
+      timestamp: new Date().toISOString()
+    });
+  });
 });
 
 app.post('/api/info', async (req, res) => {
@@ -52,18 +67,19 @@ app.post('/api/info', async (req, res) => {
     }
   }
 
-  // Senior DevOps Optimization: Exact flags for fast metadata fetching
+  // Professional flags for bypass and stability
   const args = [
     "--dump-single-json",
-    "--skip-download",
     "--no-playlist",
     "--no-warnings",
+    "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
+    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
     url
   ];
 
-  console.log(`[INFO] Analyzing URL: ${url}`);
+  console.log(`[INFO] Analyzing: ${url}`);
 
   const ytdlp = spawn("yt-dlp", args);
 
@@ -72,8 +88,8 @@ app.post('/api/info', async (req, res) => {
 
   const timeout = setTimeout(() => {
     ytdlp.kill();
-    console.error(`[TIMEOUT] yt-dlp took too long for: ${url}`);
-  }, 20000); // 20s timeout
+    console.error(`[TIMEOUT] yt-dlp killed after 25s for: ${url}`);
+  }, 25000);
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -82,10 +98,17 @@ app.post('/api/info', async (req, res) => {
     clearTimeout(timeout);
 
     if (code !== 0) {
-      console.error(`[ERROR] yt-dlp failed with code ${code}:`, stderrData);
+      console.error(`[ERROR] yt-dlp failed (Code ${code}):`, stderrData);
+      
+      // Clean up common error messages for user
+      let userFriendlyError = "Analysis Failed";
+      if (stderrData.includes("Sign in to confirm your age")) userFriendlyError = "Age restricted content requires login.";
+      else if (stderrData.includes("Video unavailable")) userFriendlyError = "This video is unavailable.";
+      else if (stderrData.includes("403")) userFriendlyError = "Access denied by platform (Rate limited).";
+
       return res.status(500).json({ 
-        error: "Analysis Failed", 
-        message: stderrData.split('\n')[0] || "Check backend logs for details"
+        error: userFriendlyError, 
+        details: stderrData.split('\n')[0] 
       });
     }
 
@@ -143,7 +166,7 @@ app.post('/api/info', async (req, res) => {
 
     } catch (parseError) {
       console.error('[PARSE ERROR]:', parseError.message);
-      res.status(500).json({ error: "Failed to process metadata" });
+      res.status(500).json({ error: "Failed to parse video data" });
     }
   });
 });
@@ -163,17 +186,20 @@ app.get('/api/download', (req, res) => {
     const onComplete = () => {
       activeDownloads--;
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
-      if (downloadQueue.length > 0) downloadQueue.shift()();
+      if (downloadQueue.length > 0) {
+        const nextTask = downloadQueue.shift();
+        nextTask();
+      }
     };
 
     try {
-      res.header('Content-Disposition', `attachment; filename="SaveStream_Download.${ext}"`);
+      res.header('Content-Disposition', `attachment; filename="SaveStream_${crypto.randomUUID()}.${ext}"`);
+      
       const args = isAudioOnly 
         ? ["-f", "bestaudio", "--extract-audio", "--audio-format", "mp3", "--no-check-certificate", "-o", tempFilePath, url]
         : ["-f", formatArg, "--merge-output-format", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
 
       console.log(`[DOWNLOAD] Starting: ${url}`);
-      
       const ytdlpDownload = spawn("yt-dlp", args);
 
       ytdlpDownload.on("close", (code) => {
