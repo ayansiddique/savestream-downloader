@@ -1,12 +1,13 @@
-FROM node:20
+FROM node:20-bullseye
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip ffmpeg curl && \
+    apt-get install -y ffmpeg python3 curl && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-# Install yt-dlp using pip (most stable way)
-RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
+# Download the latest yt-dlp binary directly (the most stable way for Linux)
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
 WORKDIR /app
 

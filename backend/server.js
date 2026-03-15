@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', 1);
 
-// Permissive CORS for Vercel
+// Permissive CORS
 app.use(cors());
 app.use(express.json());
 
@@ -23,16 +23,11 @@ let activeDownloads = 0;
 const downloadQueue = [];
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running");
+  res.send("SaveStream Backend Running v2");
 });
 
-// Check if yt-dlp is working
-app.get("/api/test", (req, res) => {
-    exec("python3 -m yt_dlp --version", (err, stdout) => {
-        if (err) return res.status(500).send("yt-dlp NOT found: " + err.message);
-        res.send("yt-dlp version: " + stdout.trim());
-    });
-});
+// Helper to get absolute yt-dlp path
+const YTPATH = '/usr/local/bin/yt-dlp';
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
@@ -41,20 +36,20 @@ app.post('/api/info', async (req, res) => {
   if (infoCache.has(url)) {
     const cachedData = infoCache.get(url);
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
-    infoCache.delete(url);
   }
 
-  // Optimized execution using python module directly
-  const cmd = `python3 -m yt_dlp --dump-single-json --no-playlist --no-warnings --skip-download --no-check-certificate --force-ipv4 "${url}"`;
+  // Use absolute path to the binary we downloaded in Dockerfile
+  const cmd = `${YTPATH} --dump-single-json --no-playlist --no-warnings --skip-download --no-check-certificate --force-ipv4 "${url}"`;
 
   console.log(`Analyzing: ${url}`);
 
   exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
     if (err) {
       console.error('Extraction Error:', stderr || err.message);
+      // Send a more descriptive error to the frontend
       return res.status(500).json({ 
-        error: 'Failed to extract video info.',
-        debug: stderr || err.message 
+        error: 'Analysis Failed. The link might be protected or server is busy.',
+        debug: stderr.substring(0, 100) || err.message 
       });
     }
 
@@ -69,15 +64,13 @@ app.post('/api/info', async (req, res) => {
           ext: f.ext,
           size: f.filesize || f.filesize_approx,
           hasAudio: f.acodec !== 'none'
-        }));
+        }))
+        .filter(f => f.resolution);
 
       const qualities = [];
       const seen = new Set();
       
-      const sortedFormats = formats.sort((a, b) => {
-          if (a.hasAudio === b.hasAudio) return (b.size || 0) - (a.size || 0);
-          return a.hasAudio ? -1 : 1;
-      });
+      const sortedFormats = formats.sort((a, b) => (b.size || 0) - (a.size || 0));
 
       sortedFormats.forEach(f => {
         const height = f.resolution.split('x')[1] || f.height;
@@ -152,11 +145,12 @@ app.get('/api/download', (req, res) => {
     try {
       res.header('Content-Disposition', `attachment; filename="video.${ext}"`);
       const cmd = isAudioOnly 
-        ? `python3 -m yt_dlp -f bestaudio --extract-audio --audio-format mp3 --no-check-certificate -o "${tempFilePath}" "${url}"`
-        : `python3 -m yt_dlp -f "${formatArg}" --merge-output-format mp4 --no-check-certificate -o "${tempFilePath}" "${url}"`;
+        ? `${YTPATH} -f bestaudio --extract-audio --audio-format mp3 --no-check-certificate -o "${tempFilePath}" "${url}"`
+        : `${YTPATH} -f "${formatArg}" --merge-output-format mp4 --no-check-certificate -o "${tempFilePath}" "${url}"`;
 
       exec(cmd, (err) => {
         if (err) {
+            console.error('Download Error:', err.message);
             if (!res.headersSent) res.status(500).send('Download failed');
             onComplete();
             return;
@@ -177,5 +171,5 @@ app.get('/api/download', (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server v2 running on port ${PORT}`);
 });
