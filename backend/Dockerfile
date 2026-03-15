@@ -1,15 +1,15 @@
 FROM node:20-bullseye
 
-# Install system dependencies
+# Install ffmpeg and python
 RUN apt-get update && \
     apt-get install -y ffmpeg python3 curl && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-# Download the latest yt-dlp binary directly (the most stable way for Linux)
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp
-
 WORKDIR /app
+
+# Download yt-dlp into the app directory directly
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /app/yt-dlp && \
+    chmod 777 /app/yt-dlp
 
 COPY package*.json ./
 RUN npm install

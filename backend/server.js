@@ -10,8 +10,6 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', 1);
-
-// Permissive CORS
 app.use(cors());
 app.use(express.json());
 
@@ -22,12 +20,12 @@ const MAX_CONCURRENT_DOWNLOADS = 3;
 let activeDownloads = 0;
 const downloadQueue = [];
 
-app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running v2");
-});
+// Helper to get yt-dlp path - using the one in /app
+const YTPATH = '/app/yt-dlp';
 
-// Helper to get absolute yt-dlp path
-const YTPATH = '/usr/local/bin/yt-dlp';
+app.get("/", (req, res) => {
+  res.send("SaveStream Backend Running v3");
+});
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
@@ -38,7 +36,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Use absolute path to the binary we downloaded in Dockerfile
+  // Use absolute path to the binary in /app
   const cmd = `${YTPATH} --dump-single-json --no-playlist --no-warnings --skip-download --no-check-certificate --force-ipv4 "${url}"`;
 
   console.log(`Analyzing: ${url}`);
@@ -46,10 +44,9 @@ app.post('/api/info', async (req, res) => {
   exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
     if (err) {
       console.error('Extraction Error:', stderr || err.message);
-      // Send a more descriptive error to the frontend
+      // SENDING ACTUAL ERROR TO UI FOR DEBUGGING
       return res.status(500).json({ 
-        error: 'Analysis Failed. The link might be protected or server is busy.',
-        debug: stderr.substring(0, 100) || err.message 
+        error: `Analysis Failed: ${stderr.substring(0, 100) || err.message}`
       });
     }
 
@@ -64,8 +61,7 @@ app.post('/api/info', async (req, res) => {
           ext: f.ext,
           size: f.filesize || f.filesize_approx,
           hasAudio: f.acodec !== 'none'
-        }))
-        .filter(f => f.resolution);
+        }));
 
       const qualities = [];
       const seen = new Set();
@@ -107,15 +103,13 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (parseErr) {
-      res.status(500).json({ error: 'Failed to process video metadata.' });
+      res.status(500).json({ error: 'Failed to process metadata' });
     }
   });
 });
 
 app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
-  if (!url) return res.status(400).send('URL is required');
-
   const isAudioOnly = ext === 'mp3';
   const formatArg = isAudioOnly ? 'bestaudio' : (format_id ? `${format_id}+bestaudio/best` : 'bestvideo+bestaudio/best');
   
@@ -124,22 +118,10 @@ app.get('/api/download', (req, res) => {
     if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
 
     const tempFilePath = path.join(downloadsDir, `dl_${crypto.randomUUID()}.${ext}`);
-    let active = true;
-
-    const cleanup = () => {
-      if (!active) return;
-      active = false;
-      if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
-    };
-
     const onComplete = () => {
-      cleanup();
       activeDownloads--;
-      if (downloadQueue.length > 0) {
-        const next = downloadQueue.shift();
-        activeDownloads++;
-        next();
-      }
+      if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
+      if (downloadQueue.length > 0) downloadQueue.shift()();
     };
 
     try {
@@ -150,7 +132,6 @@ app.get('/api/download', (req, res) => {
 
       exec(cmd, (err) => {
         if (err) {
-            console.error('Download Error:', err.message);
             if (!res.headersSent) res.status(500).send('Download failed');
             onComplete();
             return;
@@ -171,5 +152,5 @@ app.get('/api/download', (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server v2 running on port ${PORT}`);
+  console.log(`Server v3 running on port ${PORT}`);
 });
