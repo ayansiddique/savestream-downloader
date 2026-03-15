@@ -26,7 +26,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Format Optimized v5.0");
+  res.send("SaveStream Backend Running - Standard MP4 Mode");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -38,6 +38,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
+  // Optimized Analysis Flags
   const args = [
     "--dump-single-json",
     "--no-playlist",
@@ -45,8 +46,8 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
+    "--format-sort", "ext:mp4:m4a", // Prioritize MP4 compatible formats
     "--extractor-args", "youtube:player_client=ios,web_embedded;player_skip=configs",
-    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     url
   ];
 
@@ -62,8 +63,7 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      console.error(`[ERROR] Code ${code}:`, stderrData);
-      return res.status(500).json({ error: "Analysis Failed: Please check the link or try again." });
+      return res.status(500).json({ error: "Analysis Failed: Please try again." });
     }
 
     try {
@@ -73,7 +73,7 @@ app.post('/api/info', async (req, res) => {
         .map(f => ({
           format_id: f.format_id,
           resolution: f.resolution || `${f.width}x${f.height}`,
-          ext: f.ext,
+          ext: 'mp4',
           size: f.filesize || f.filesize_approx,
           hasAudio: f.acodec !== 'none'
         }));
@@ -81,35 +81,27 @@ app.post('/api/info', async (req, res) => {
       const qualities = [];
       const seen = new Set();
       formats.sort((a, b) => (b.size || 0) - (a.size || 0)).forEach(f => {
-        const height = f.resolution.split('x')[1] || f.height;
-        if (!height) return;
-        const label = `${height}p`;
+        const height = f.resolution.split('x')[1] || f.height || f.resolution;
+        const label = height.toString().includes('p') ? height : `${height}p`;
         if (!seen.has(label)) {
           seen.add(label);
           qualities.push({ label, format_id: f.format_id, ext: 'mp4', size: f.size, hasAudio: f.hasAudio });
         }
       });
 
-      // Ensure we always show an audio option if at least one audio stream exists
-      const hasAudioStreams = (data.formats || []).some(f => f.acodec !== 'none');
-
       const responseData = {
         title: data.title,
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
-        formats: qualities,
-        audio: hasAudioStreams ? { 
-            format_id: 'bestaudio', 
-            ext: 'mp3', 
-            size: (data.formats || []).find(f => f.acodec !== 'none')?.filesize || 0 
-        } : null
+        formats: qualities.slice(0, 8), // Top 8 qualities
+        audio: { format_id: 'bestaudio', ext: 'mp3', size: 0 }
       };
 
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse video data" });
+      res.status(500).json({ error: "Failed to parse data" });
     }
   });
 });
@@ -118,28 +110,25 @@ app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudioOnly = ext === 'mp3';
   
-  // ULTRA COMPATIBILITY MODE: Force H.264/AAC for Video and MP3 for Audio
-  // This ensures the video has a screen (not black) and audio (works everywhere)
+  // Back to Standard MP4 logic that works natively on Windows/Mobile
   const formatArg = isAudioOnly 
     ? "bestaudio/best" 
     : (format_id && format_id !== 'best' 
         ? `${format_id}+bestaudio/best` 
-        : "bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/best[vcodec^=avc1]/best");
+        : "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
 
   const tempFilePath = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${isAudioOnly ? 'mp3' : 'mp4'}`);
   
   const args = isAudioOnly 
     ? ["-f", formatArg, "--extract-audio", "--audio-format", "mp3", "--no-check-certificate", "-o", tempFilePath, url]
-    : ["-f", formatArg, "--merge-output-format", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
+    : ["-f", formatArg, "--merge-output-format", "mp4", "--remux-video", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
 
-  console.log(`[DOWNLOAD] Compatibility Mode On: ${url}`);
+  console.log(`[DOWNLOAD] Standard Mode: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
 
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    
-    const finalFilename = isAudioOnly ? 'SaveStream_Audio.mp3' : 'SaveStream_Video.mp4';
-    res.download(tempFilePath, finalFilename, (err) => {
+    res.download(tempFilePath, `video.${ext}`, () => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
