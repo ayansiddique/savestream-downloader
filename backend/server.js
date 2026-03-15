@@ -26,7 +26,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Standard MP4 Mode");
+  res.send("SaveStream Backend Running - Bypass v7.0");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -38,24 +38,35 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Optimized Analysis Flags
-  const args = [
+  // Multi-Client Bypass Strategy for YouTube and others
+  let args = [
     "--dump-single-json",
     "--no-playlist",
     "--no-warnings",
     "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
-    "--format-sort", "ext:mp4:m4a", // Prioritize MP4 compatible formats
-    "--extractor-args", "youtube:player_client=ios,web_embedded;player_skip=configs",
-    url
+    "--add-header", "Accept-Language:en-US,en;q=0.9",
+    "--format-sort", "ext:mp4:m4a"
   ];
 
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    // Current best bypass clients for YouTube
+    args.push("--extractor-args", "youtube:player_client=android_vr,ios,web_embedded;player_skip=configs");
+    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+  } else {
+    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+  }
+
+  args.push(url);
+
+  console.log(`[INFO] Analyzing URL: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
+  
   let stdoutData = "";
   let stderrData = "";
 
-  const timeout = setTimeout(() => { ytdlp.kill(); }, 50000);
+  const timeout = setTimeout(() => { ytdlp.kill(); }, 55000);
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -63,7 +74,18 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      return res.status(500).json({ error: "Analysis Failed: Please try again." });
+      console.error(`[ERROR] Code ${code}:`, stderrData);
+      
+      let errorMessage = "Analysis Failed";
+      if (stderrData.includes("confirm you're not a bot")) {
+        errorMessage = "Analysis Failed: System blocked (Bot detected). Please try a different video or try again later.";
+      } else if (stderrData.includes("Sign in to confirm your age")) {
+        errorMessage = "Analysis Failed: Age-restricted video.";
+      } else {
+        errorMessage = `Analysis Failed: ${stderrData.split('\n')[0].substring(0, 100)}`;
+      }
+
+      return res.status(500).json({ error: errorMessage });
     }
 
     try {
@@ -94,14 +116,14 @@ app.post('/api/info', async (req, res) => {
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
-        formats: qualities.slice(0, 8), // Top 8 qualities
+        formats: qualities.slice(0, 10), 
         audio: { format_id: 'bestaudio', ext: 'mp3', size: 0 }
       };
 
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse data" });
+      res.status(500).json({ error: "Analysis Failed: System was unable to process this link." });
     }
   });
 });
@@ -110,7 +132,6 @@ app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudioOnly = ext === 'mp3';
   
-  // Back to Standard MP4 logic that works natively on Windows/Mobile
   const formatArg = isAudioOnly 
     ? "bestaudio/best" 
     : (format_id && format_id !== 'best' 
@@ -123,9 +144,7 @@ app.get('/api/download', (req, res) => {
     ? ["-f", formatArg, "--extract-audio", "--audio-format", "mp3", "--no-check-certificate", "-o", tempFilePath, url]
     : ["-f", formatArg, "--merge-output-format", "mp4", "--remux-video", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
 
-  console.log(`[DOWNLOAD] Standard Mode: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
-
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
     res.download(tempFilePath, `video.${ext}`, () => {
