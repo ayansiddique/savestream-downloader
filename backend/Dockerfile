@@ -1,14 +1,12 @@
-FROM node:20-bullseye
+FROM node:20-slim
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg python3 curl && \
+    apt-get install -y python3 python3-pip ffmpeg curl && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-# Download the latest yt-dlp binary directly (standalone version)
-# This is often more stable than the pip version in Docker
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp
+# Install yt-dlp via pip (most stable for Railway)
+RUN pip3 install --no-cache-dir -U yt-dlp --break-system-packages
 
 WORKDIR /app
 
@@ -17,7 +15,7 @@ RUN npm install
 
 COPY . .
 
-# Permissions for the downloads directory
+# Create downloads folder with full permissions
 RUN mkdir -p downloads && chmod 777 downloads
 
 EXPOSE 8080
