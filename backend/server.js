@@ -38,7 +38,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Multi-Client Bypass Strategy for YouTube and others
+  // Ultra-Resilient Bypass Logic for YouTube and TikTok
   let args = [
     "--dump-single-json",
     "--no-playlist",
@@ -46,27 +46,32 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
+    "--geo-bypass",
     "--add-header", "Accept-Language:en-US,en;q=0.9",
+    "--add-header", "Sec-Ch-Ua-Platform:Windows",
     "--format-sort", "ext:mp4:m4a"
   ];
 
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    // Current best bypass clients for YouTube
-    args.push("--extractor-args", "youtube:player_client=android_vr,ios,web_embedded;player_skip=configs");
+    // Combined player clients to find the first one that works
+    args.push("--extractor-args", "youtube:player_client=android,web,ios,mweb;player_skip=configs");
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+  } else if (url.includes('tiktok.com')) {
+    args.push("--add-header", "Referer:https://www.tiktok.com/");
+    args.push("--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
   } else {
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   }
 
   args.push(url);
 
-  console.log(`[INFO] Analyzing URL: ${url}`);
+  console.log(`[INFO] Deep Analysis: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
   let stderrData = "";
 
-  const timeout = setTimeout(() => { ytdlp.kill(); }, 55000);
+  const timeout = setTimeout(() => { ytdlp.kill(); }, 60000); // 1 minute timeout
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
