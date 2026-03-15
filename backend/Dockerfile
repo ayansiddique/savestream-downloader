@@ -1,13 +1,12 @@
 FROM node:20
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && \
     apt-get install -y python3 python3-pip ffmpeg curl && \
     ln -s /usr/bin/python3 /usr/bin/python
 
-# Install yt-dlp to a reliable location
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
-    chmod a+rx /usr/local/bin/yt-dlp
+# Install yt-dlp using pip (most stable way)
+RUN pip3 install --no-cache-dir yt-dlp --break-system-packages
 
 WORKDIR /app
 

@@ -1,8 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -13,7 +11,7 @@ const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', 1);
 
-// Permissive middleware for stable cross-origin connection
+// Permissive CORS for Vercel
 app.use(cors());
 app.use(express.json());
 
@@ -24,24 +22,17 @@ const MAX_CONCURRENT_DOWNLOADS = 3;
 let activeDownloads = 0;
 const downloadQueue = [];
 
-// Rate Limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  max: 100, 
-  message: 'Too many requests from this IP, please try again after 15 minutes',
-});
-app.use('/api/', apiLimiter);
-
 app.get("/", (req, res) => {
   res.send("SaveStream Backend Running");
 });
 
-// Helper to find yt-dlp path
-const getYtDlpCommand = () => {
-    if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
-    if (fs.existsSync('/usr/bin/yt-dlp')) return '/usr/bin/yt-dlp';
-    return 'yt-dlp';
-};
+// Check if yt-dlp is working
+app.get("/api/test", (req, res) => {
+    exec("python3 -m yt_dlp --version", (err, stdout) => {
+        if (err) return res.status(500).send("yt-dlp NOT found: " + err.message);
+        res.send("yt-dlp version: " + stdout.trim());
+    });
+});
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
@@ -49,23 +40,21 @@ app.post('/api/info', async (req, res) => {
 
   if (infoCache.has(url)) {
     const cachedData = infoCache.get(url);
-    if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-      return res.json(cachedData.data);
-    }
+    if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
     infoCache.delete(url);
   }
 
-  const ytDlpCmd = getYtDlpCommand();
-  const cmd = `${ytDlpCmd} --dump-single-json --no-playlist --no-warnings --skip-download --no-check-certificate --force-ipv4 "${url}"`;
+  // Optimized execution using python module directly
+  const cmd = `python3 -m yt_dlp --dump-single-json --no-playlist --no-warnings --skip-download --no-check-certificate --force-ipv4 "${url}"`;
 
-  console.log(`Executing: ${cmd}`);
+  console.log(`Analyzing: ${url}`);
 
   exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
     if (err) {
-      console.error('Info extraction failed:', stderr || err.message);
+      console.error('Extraction Error:', stderr || err.message);
       return res.status(500).json({ 
         error: 'Failed to extract video info.',
-        details: stderr || err.message 
+        debug: stderr || err.message 
       });
     }
 
@@ -122,15 +111,10 @@ app.post('/api/info', async (req, res) => {
         } : null
       };
 
-      infoCache.set(url, {
-        timestamp: Date.now(),
-        data: responseData
-      });
-
+      infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (parseErr) {
-      console.error('Parse error:', parseErr.message);
-      res.status(500).json({ error: 'Failed to process metadata' });
+      res.status(500).json({ error: 'Failed to process video metadata.' });
     }
   });
 });
@@ -141,8 +125,7 @@ app.get('/api/download', (req, res) => {
 
   const isAudioOnly = ext === 'mp3';
   const formatArg = isAudioOnly ? 'bestaudio' : (format_id ? `${format_id}+bestaudio/best` : 'bestvideo+bestaudio/best');
-  const ytDlpCmd = getYtDlpCommand();
-
+  
   const startDownload = async () => {
     const downloadsDir = path.join(__dirname, 'downloads');
     if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
@@ -169,23 +152,18 @@ app.get('/api/download', (req, res) => {
     try {
       res.header('Content-Disposition', `attachment; filename="video.${ext}"`);
       const cmd = isAudioOnly 
-        ? `${ytDlpCmd} -f bestaudio --extract-audio --audio-format mp3 --no-check-certificate -o "${tempFilePath}" "${url}"`
-        : `${ytDlpCmd} -f "${formatArg}" --merge-output-format mp4 --no-check-certificate -o "${tempFilePath}" "${url}"`;
+        ? `python3 -m yt_dlp -f bestaudio --extract-audio --audio-format mp3 --no-check-certificate -o "${tempFilePath}" "${url}"`
+        : `python3 -m yt_dlp -f "${formatArg}" --merge-output-format mp4 --no-check-certificate -o "${tempFilePath}" "${url}"`;
 
       exec(cmd, (err) => {
         if (err) {
-            console.error('Download exec error:', err.message);
             if (!res.headersSent) res.status(500).send('Download failed');
             onComplete();
             return;
         }
-        res.download(tempFilePath, isAudioOnly ? 'audio.mp3' : 'video.mp4', (err) => {
-            if (err) console.error('Stream error:', err.message);
-            onComplete();
-        });
+        res.download(tempFilePath, isAudioOnly ? 'audio.mp3' : 'video.mp4', () => onComplete());
       });
     } catch (e) {
-      console.error('Download catch error:', e.message);
       onComplete();
     }
   };
