@@ -16,6 +16,11 @@ app.set('trust proxy', 1);
 const infoCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
+// Queue system state
+const MAX_CONCURRENT_DOWNLOADS = 3;
+let activeDownloads = 0;
+const downloadQueue = [];
+
 // Middleware
 app.use(helmet());
 app.use(cors({
@@ -187,7 +192,7 @@ app.get('/api/download', (req, res) => {
     }
   };
 
-  if (activeDownloads >= 3) {
+  if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
     downloadQueue.push(startDownload);
   } else {
     activeDownloads++;
