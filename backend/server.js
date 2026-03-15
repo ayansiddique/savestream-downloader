@@ -13,23 +13,18 @@ const PORT = process.env.PORT || 8080;
 
 app.set('trust proxy', 1);
 
+// Permissive middleware for stable cross-origin connection
+app.use(cors());
+app.use(express.json());
+
 const infoCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
-// Queue system state
 const MAX_CONCURRENT_DOWNLOADS = 3;
 let activeDownloads = 0;
 const downloadQueue = [];
 
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type"]
-}));
-app.use(express.json());
-
+// Rate Limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100, 
@@ -43,10 +38,9 @@ app.get("/", (req, res) => {
 
 // Helper to find yt-dlp path
 const getYtDlpCommand = () => {
-    // Check common paths in Linux/Docker
     if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
     if (fs.existsSync('/usr/bin/yt-dlp')) return '/usr/bin/yt-dlp';
-    return 'yt-dlp'; // Fallback to PATH
+    return 'yt-dlp';
 };
 
 app.post('/api/info', async (req, res) => {
@@ -147,7 +141,6 @@ app.get('/api/download', (req, res) => {
 
   const isAudioOnly = ext === 'mp3';
   const formatArg = isAudioOnly ? 'bestaudio' : (format_id ? `${format_id}+bestaudio/best` : 'bestvideo+bestaudio/best');
-  
   const ytDlpCmd = getYtDlpCommand();
 
   const startDownload = async () => {
@@ -175,7 +168,6 @@ app.get('/api/download', (req, res) => {
 
     try {
       res.header('Content-Disposition', `attachment; filename="video.${ext}"`);
-      
       const cmd = isAudioOnly 
         ? `${ytDlpCmd} -f bestaudio --extract-audio --audio-format mp3 --no-check-certificate -o "${tempFilePath}" "${url}"`
         : `${ytDlpCmd} -f "${formatArg}" --merge-output-format mp4 --no-check-certificate -o "${tempFilePath}" "${url}"`;
@@ -192,7 +184,6 @@ app.get('/api/download', (req, res) => {
             onComplete();
         });
       });
-
     } catch (e) {
       console.error('Download catch error:', e.message);
       onComplete();
