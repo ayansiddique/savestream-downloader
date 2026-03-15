@@ -19,14 +19,13 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Ultimate Solution v20.0 (Live)");
+  res.send("SaveStream Backend Running - Ultimate Solution v21.0 (Live)");
 });
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  // Ultimate Stealth Headers
   const randomIP = `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
   
   let args = [
@@ -40,7 +39,6 @@ app.post('/api/info', async (req, res) => {
   ];
 
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    // IOS client is currently the MOST resilient for bot detection
     args.push("--extractor-args", "youtube:player_client=ios,android;player_skip=configs");
     args.push("--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1");
     args.push("--add-header", `X-Forwarded-For:${randomIP}`);
@@ -53,7 +51,7 @@ app.post('/api/info', async (req, res) => {
 
   args.push(url);
 
-  console.log(`[V20 NUCLEAR] Analyzing: ${url}`);
+  console.log(`[V21 FINAL] Analysis started for: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
@@ -68,7 +66,7 @@ app.post('/api/info', async (req, res) => {
     if (code !== 0) {
       const errorMsg = stderrData.trim();
       let userError = "Analysis Failed";
-      if (errorMsg.includes("confirm you're not a bot")) userError = "YouTube is currently blocking the server. Please try a TikTok/Instagram link or wait 10 minutes.";
+      if (errorMsg.includes("bot")) userError = "YouTube is currently blocking the server. Please try a different video or wait 5 minutes.";
       else userError = `Analysis Failed: ${errorMsg.split('\n')[0].substring(0, 100)}`;
       return res.status(500).json({ error: userError });
     }
@@ -79,54 +77,81 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       let qualities = [];
 
-      // Improved Format Parsing: Ensures buttons ALWAYS show for video
-      rawFormats.forEach(f => {
-        // If it's a pure audio stream, skip it for the video tab
-        if (f.vcodec === 'none') return;
-        
-        const w = f.width || 0;
-        const h = f.height || 0;
-        const resVal = Math.min(w, h) || h || w || 0;
-        
-        // Basic label calculation
-        let label = resVal > 0 ? `${resVal}p` : "HD Video";
-        if (resVal >= 1080) label = "1080p Full HD";
-        else if (resVal >= 720) label = "720p HD";
-
-        if (!seenLabels.has(label)) {
-          seenLabels.add(label);
+      // If no formats array but we have shared URL (common for direct downloaders)
+      if (rawFormats.length === 0 && (data.url || data.webpage_url)) {
           qualities.push({
-            label: label,
-            format_id: f.format_id || 'best',
+            label: "Best Quality",
+            format_id: "best",
             ext: 'mp4',
-            size: f.filesize || f.filesize_approx || 0,
+            size: data.filesize || data.filesize_approx || 0,
             hasAudio: true
           });
-        }
-      });
+      } else {
+          // Process formats robustly
+          rawFormats.forEach(f => {
+            // Exclude audio-only streams from video list
+            if (f.vcodec === 'none' || f.acodec === 'none' && !f.vcodec) return;
+            
+            const w = f.width || 0;
+            const h = f.height || 0;
+            const resVal = Math.min(w, h) || h || w || 0;
+            
+            let label = "HD Video";
+            if (resVal >= 2160) label = "4K Ultra HD";
+            else if (resVal >= 1440) label = "2K Quad HD";
+            else if (resVal >= 1080) label = "1080p Full HD";
+            else if (resVal >= 720) label = "720p HD";
+            else if (resVal >= 480) label = "480p SD";
+            else if (resVal >= 360) label = "360p SD";
+            else if (resVal > 0) label = `${resVal}p`;
 
-      // Special fallback if no qualities were found but we have video info
-      if (qualities.length === 0) {
-        qualities.push({ label: "Best Quality", format_id: "best", ext: "mp4", size: 0, hasAudio: true });
+            if (!seenLabels.has(label)) {
+              seenLabels.add(label);
+              qualities.push({
+                label: label,
+                format_id: f.format_id || 'best',
+                ext: 'mp4',
+                size: f.filesize || f.filesize_approx || 0,
+                hasAudio: true
+              });
+            }
+          });
       }
 
-      qualities.sort((a, b) => (parseInt(b.label) || 0) - (parseInt(a.label) || 0));
+      // Final fallback if list is still empty
+      if (qualities.length === 0) {
+        qualities.push({ label: "Best Available (MP4)", format_id: "best", ext: "mp4", size: 0, hasAudio: true });
+      }
+
+      // Sort: 4K > 1080 > 720 ...
+      qualities.sort((a, b) => {
+          const order = ["4K", "2K", "1080", "720", "480", "360"];
+          const getRank = (lbl) => {
+              for(let i=0; i<order.length; i++) if(lbl.includes(order[i])) return i;
+              return 99;
+          };
+          return getRank(a.label) - getRank(b.label);
+      });
 
       const bestAudio = rawFormats.filter(f => f.vcodec === 'none')
-        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
+        .sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0))[0];
 
       const responseData = {
-        title: data.title || "Video",
+        title: data.title || "Social Video",
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
         formats: qualities.slice(0, 10),
-        audio: { format_id: bestAudio ? bestAudio.format_id : 'bestaudio', ext: 'mp3', size: 0 }
+        audio: { 
+            format_id: bestAudio ? bestAudio.format_id : 'bestaudio', 
+            ext: 'mp3', 
+            size: bestAudio ? (bestAudio.filesize || bestAudio.filesize_approx || 0) : 0 
+        }
       };
 
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse platform data." });
+      res.status(500).json({ error: "Failed to read platform response. Try another link." });
     }
   });
 });
@@ -157,7 +182,7 @@ app.get('/api/download', (req, res) => {
   const ytdlp = spawn(getYTCommand(), args);
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    res.download(tempFilePath, `savestream_media.${ext}`, () => {
+    res.download(tempFilePath, `savestream_media.${ext}`, (err) => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
