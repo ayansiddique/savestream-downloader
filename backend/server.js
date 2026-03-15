@@ -30,7 +30,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running");
+  res.send("SaveStream Backend Running - Bypass Active");
 });
 
 app.get("/api/health", (req, res) => {
@@ -60,7 +60,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Ultra-Resilient Flags for Production
+  // Advanced Bypass for Data Center IPs (Railway/AWS)
   const args = [
     "--dump-single-json",
     "--no-playlist",
@@ -69,7 +69,10 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    // Mimic the mobile YouTube player client to bypass "bot" detection
+    "--extractor-args", "youtube:player_client=ios,web",
+    "--add-header", "User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1",
+    "--add-header", "Accept-Language:en-US,en;q=0.9",
     url
   ];
 
@@ -79,7 +82,7 @@ app.post('/api/info', async (req, res) => {
 
   const timeout = setTimeout(() => {
     ytdlp.kill();
-  }, 30000);
+  }, 45000); // Increased timeout for bypass evaluation
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -89,11 +92,9 @@ app.post('/api/info', async (req, res) => {
     if (code !== 0) {
       console.error(`[ERROR] Code ${code}:`, stderrData);
       
-      // Extract the most readable part of the error for the user
       let errorMessage = "Analysis Failed";
-      if (stderrData.includes("Sign in to confirm your age")) errorMessage = "Analysis Failed: Age restricted video.";
-      else if (stderrData.includes("403: Forbidden")) errorMessage = "Analysis Failed: Platform blocked the request (Rate Limited).";
-      else if (stderrData.includes("Video unavailable")) errorMessage = "Analysis Failed: Video is unavailable or private.";
+      if (stderrData.includes("confirm you're not a bot")) errorMessage = "Analysis Failed: Platform is blocking the request. Try again in a minute.";
+      else if (stderrData.includes("Sign in to confirm your age")) errorMessage = "Analysis Failed: Age restricted video.";
       else errorMessage = `Analysis Failed: ${stderrData.split('\n')[0].substring(0, 100)}`;
 
       return res.status(500).json({ error: errorMessage });
@@ -140,7 +141,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Data parsing error." });
+      res.status(500).json({ error: "Failed to parse video data" });
     }
   });
 });
