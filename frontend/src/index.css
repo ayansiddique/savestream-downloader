@@ -77,15 +77,18 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 2rem;
+  padding: 1.2rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
+  position: relative;
+  z-index: 10;
 }
 
 .logo {
   font-size: 1.5rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   display: flex;
@@ -112,19 +115,35 @@ body {
 
 .nav-links {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
+  list-style: none;
 }
 
 .nav-link {
+  display: inline-block;
   color: var(--text-color);
   text-decoration: none;
+  font-size: 0.95rem;
   font-weight: 600;
-  transition: color 0.2s;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
   color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--input-border);
+  margin: 0 0.25rem;
 }
 
 .container {

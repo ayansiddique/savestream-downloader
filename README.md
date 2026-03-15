@@ -82,7 +82,7 @@ A modern, powerful Video Downloader Website built with React, Vite, Node.js, and
    - **Environment**: `Node`
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
-6. Render will automatically provision the environment. Note down the deployed URL (e.g., `https://my-backend.onrender.com`).
+6. Render will automatically provision the environment. Note down the deployed URL (e.g., `https://savestream-downloader-production.up.railway.app`).
 
 *Note on Server Resources:* Video downloading paths stream data. Keep an eye on bandwidth limits of the free tier.
 
@@ -90,7 +90,7 @@ A modern, powerful Video Downloader Website built with React, Vite, Node.js, and
 1. Update your `frontend/src/App.jsx` to point to the new Render backend URL instead of localhost:
    Change the `API_BASE` placeholder to your published Render URL.
    ```javascript
-   const API_BASE = 'https://my-backend.onrender.com/api';
+   const API_BASE = 'https://savestream-downloader-production.up.railway.app/api';
    ```
 2. Push your `frontend` code to a GitHub repository.
 3. Log in to [Vercel](https://vercel.com) and click **Add New** -> **Project**.
@@ -103,7 +103,7 @@ A modern, powerful Video Downloader Website built with React, Vite, Node.js, and
 ## Environment Variables Support
 If you prefer, you can use `.env` files for the frontend instead of hardcoding `API_BASE`:
 1. Create `.env.production` in `frontend` directory with:
-   `VITE_API_BASE=https://my-backend.onrender.com/api`
+   `VITE_API_BASE=https://savestream-downloader-production.up.railway.app/api`
 2. Update `App.jsx` to use:
    `const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';`
 
