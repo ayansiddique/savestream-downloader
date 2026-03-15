@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -16,11 +16,14 @@ app.use(express.json());
 const infoCache = new Map();
 const CACHE_TTL = 10 * 60 * 1000;
 
-// Helper to find yt-dlp path dynamically
+const MAX_CONCURRENT_DOWNLOADS = 3;
+let activeDownloads = 0;
+const downloadQueue = [];
+
 const getYTCommand = () => {
     try {
         if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
-        return 'yt-dlp'; // Fallback to system PATH
+        return 'yt-dlp';
     } catch (e) {
         return 'yt-dlp';
     }
@@ -30,16 +33,13 @@ app.get("/", (req, res) => {
   res.send("SaveStream Backend Running");
 });
 
-// Advanced Health Check with Error Reporting
 app.get("/api/health", (req, res) => {
   const cmd = getYTCommand();
   const ytdlp = spawn(cmd, ["--version"]);
   let output = "";
   let error = "";
-
   ytdlp.stdout.on("data", (d) => output += d.toString());
   ytdlp.stderr.on("data", (d) => error += d.toString());
-
   ytdlp.on("close", (code) => {
     res.json({
       status: code === 0 ? "ready" : "error",
@@ -48,10 +48,6 @@ app.get("/api/health", (req, res) => {
       path_used: cmd,
       timestamp: new Date().toISOString()
     });
-  });
-
-  ytdlp.on("error", (err) => {
-    res.json({ status: "critical_error", details: err.message, path_used: cmd });
   });
 });
 
@@ -64,6 +60,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
+  // Ultra-Resilient Flags for Production
   const args = [
     "--dump-single-json",
     "--no-playlist",
@@ -71,7 +68,8 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
-    "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "--geo-bypass",
+    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     url
   ];
 
@@ -89,10 +87,16 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      return res.status(500).json({ 
-        error: "Analysis Failed", 
-        message: stderrData.split('\n')[0] || "Download tools error"
-      });
+      console.error(`[ERROR] Code ${code}:`, stderrData);
+      
+      // Extract the most readable part of the error for the user
+      let errorMessage = "Analysis Failed";
+      if (stderrData.includes("Sign in to confirm your age")) errorMessage = "Analysis Failed: Age restricted video.";
+      else if (stderrData.includes("403: Forbidden")) errorMessage = "Analysis Failed: Platform blocked the request (Rate Limited).";
+      else if (stderrData.includes("Video unavailable")) errorMessage = "Analysis Failed: Video is unavailable or private.";
+      else errorMessage = `Analysis Failed: ${stderrData.split('\n')[0].substring(0, 100)}`;
+
+      return res.status(500).json({ error: errorMessage });
     }
 
     try {
@@ -119,22 +123,24 @@ app.post('/api/info', async (req, res) => {
         }
       });
 
-      const audio = (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none')
-        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
-
       const responseData = {
         title: data.title,
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
         formats: qualities,
-        audio: audio ? { format_id: audio.format_id, ext: audio.ext, size: audio.filesize || audio.filesize_approx } : null
+        audio: (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none')
+          .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0] ? {
+            format_id: (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none').sort((a, b) => (b.abr || 0) - (a.abr || 0))[0].format_id,
+            ext: (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none').sort((a, b) => (b.abr || 0) - (a.abr || 0))[0].ext,
+            size: (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none').sort((a, b) => (b.abr || 0) - (a.abr || 0))[0].filesize || (data.formats || []).filter(f => f.vcodec === 'none' && f.acodec !== 'none').sort((a, b) => (b.abr || 0) - (a.abr || 0))[0].filesize_approx
+          } : null
       };
 
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse video data" });
+      res.status(500).json({ error: "Analysis Failed: Data parsing error." });
     }
   });
 });
@@ -143,7 +149,6 @@ app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudioOnly = ext === 'mp3';
   const formatArg = isAudioOnly ? 'bestaudio' : (format_id ? `${format_id}+bestaudio/best` : 'bestvideo+bestaudio/best');
-  
   const tempFilePath = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
   
   const args = isAudioOnly 
@@ -151,7 +156,6 @@ app.get('/api/download', (req, res) => {
     : ["-f", formatArg, "--merge-output-format", "mp4", "--no-check-certificate", "-o", tempFilePath, url];
 
   const ytdlp = spawn(getYTCommand(), args);
-
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
     res.download(tempFilePath, `video.${ext}`, () => {
