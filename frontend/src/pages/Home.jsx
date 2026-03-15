@@ -82,15 +82,15 @@ export default function Home() {
   };
 
   return (
-    <div className="container" style={{ minHeight: 'auto' }}>
+    <div className="container">
       <Helmet>
         <title>SaveStream - All in One Video Downloader</title>
         <meta name="description" content="Download Any Video, Anywhere. The blazing fast, secure, and modern way to save videos from YouTube, TikTok, Instagram, Twitter, and 1000+ more platforms in MP4 and MP3." />
       </Helmet>
 
-      <section className="hero" style={{ marginTop: '2rem' }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>Download Any Video,<br/>Anywhere.</h1>
-        <p style={{ fontSize: '1.2rem' }}>The blazing fast, secure, and modern way to save videos from 1000+ platforms.</p>
+      <section className="hero">
+        <h1>Download Any Video,<br/>Anywhere.</h1>
+        <p>The blazing fast, secure, and modern way to save videos from 1000+ platforms.</p>
       </section>
 
       <section className="downloader-card">
