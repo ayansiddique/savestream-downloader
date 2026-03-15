@@ -13,21 +13,21 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
-// No cache for now to ensure fresh quality results every time
+const infoCache = new Map();
 const getYTCommand = () => {
     if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
     return 'yt-dlp';
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Master Logic v15.0");
+  res.send("SaveStream Backend Running - Bot Crusher v16.0");
 });
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  // Use Android and Web clients for maximum 1080p+ success on Shorts
+  // Most resilient clients to bypass "Bot" detection in 2024/2025: android_vr and web_embedded
   let args = [
     "--dump-single-json",
     "--no-playlist",
@@ -36,13 +36,14 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--extractor-args", "youtube:player_client=android,web;player_skip=configs",
+    "--extractor-args", "youtube:player_client=android_vr,web_embedded;player_skip=configs",
     "--add-header", "Accept-Language:en-US,en;q=0.9",
-    "--add-header", "Sec-Ch-Ua-Platform:Windows",
+    "--add-header", "Sec-Fetch-Mode:navigate",
+    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
     url
   ];
 
-  console.log(`[MASTER LOGIC] Deep Analysis: ${url}`);
+  console.log(`[BOT CRUSHER] Deep Extraction: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
@@ -57,7 +58,12 @@ app.post('/api/info', async (req, res) => {
     if (code !== 0) {
       const errorMsg = stderrData.trim();
       console.error(`[ERROR] yt-dlp:`, errorMsg);
-      return res.status(500).json({ error: `Analysis Failed: ${errorMsg.split('\n')[0].substring(0, 100)}` });
+      
+      let userError = "Analysis Failed: System is temporarily busy. Please try again or use a different video link.";
+      if (errorMsg.includes("confirm you're not a bot")) userError = "Analysis Failed: YouTube is blocking the server. Please wait 1-2 minutes or try another video.";
+      else if (errorMsg.includes("Unavailable")) userError = "Analysis Failed: Video not found or private.";
+      
+      return res.status(500).json({ error: userError });
     }
 
     try {
@@ -66,22 +72,18 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
-      // Sort formats to find the best bitrate ones
-      rawFormats.sort((a, b) => (b.tbr || 0) - (a.tbr || 0));
+      rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
       rawFormats.forEach(f => {
         if (!f.vcodec || f.vcodec === 'none') return;
         
-        // Smart Resolution Labeling: 
-        // For horizontal videos, height is the quality (1080).
-        // For vertical videos (Shorts), width is usually the quality (1080).
         const w = f.width || 0;
         const h = f.height || 0;
-        const qualityValue = Math.min(w, h) || h || w; 
+        const resVal = Math.min(w, h) || h || w;
         
-        if (qualityValue < 140) return;
+        if (resVal < 140) return;
         
-        const label = `${qualityValue}p`;
+        const label = `${resVal}p`;
         if (!seenLabels.has(label)) {
           seenLabels.add(label);
           qualities.push({
@@ -94,7 +96,6 @@ app.post('/api/info', async (req, res) => {
         }
       });
 
-      // Show quality descending: 1080p > 720p > 480p
       qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
 
       const bestAudio = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none')
@@ -115,7 +116,7 @@ app.post('/api/info', async (req, res) => {
 
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Quality detection failed." });
+      res.status(500).json({ error: "Analysis Failed: Platform protected. Please try later." });
     }
   });
 });
