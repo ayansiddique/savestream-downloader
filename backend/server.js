@@ -22,19 +22,19 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Ultra High Res v9.0");
+  res.send("SaveStream Backend Running - Master High-Res v10.0");
 });
 
 app.post('/api/info', async (req, res) => {
-  const { url, force = false } = req.body;
+  const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  if (!force && infoCache.has(url)) {
+  if (infoCache.has(url)) {
     const cachedData = infoCache.get(url);
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Ultra-Resilient Bypass Logic for 1080p+ Extraction
+  // Optimized for maximum resolution discovery across all platforms
   let args = [
     "--dump-single-json",
     "--no-playlist",
@@ -42,13 +42,11 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--force-ipv4",
-    "--geo-bypass",
     "--extractor-args", "youtube:player_client=web,android;player_skip=configs",
-    "--add-header", "User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
     url
   ];
 
-  console.log(`[INFO] Deep High-Res Analysis: ${url}`);
+  console.log(`[MASTER INFO] Fetching everything for: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
@@ -61,7 +59,7 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      return res.status(500).json({ error: "Analysis Failed: Please check the link or try again." });
+      return res.status(500).json({ error: "Analysis Failed: Platform protected or busy." });
     }
 
     try {
@@ -70,21 +68,21 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
-      // Sort formats to pick the best representation for each height
-      rawFormats.sort((a, b) => (b.filesize || b.filesize_approx || 0) - (a.filesize || a.filesize_approx || 0));
+      // Sort raw formats by bitrate/fs to pick best representation later
+      rawFormats.sort((a, b) => (b.tbr || b.filesize || 0) - (a.tbr || a.filesize || 0));
 
       rawFormats.forEach(f => {
-        if (f.vcodec === 'none') return; // Skip audio-only streams
+        if (!f.vcodec || f.vcodec === 'none') return; 
         
-        let h = f.height;
-        if (!h && f.resolution) {
-            const parts = f.resolution.split('x');
-            h = parts.length > 1 ? parseInt(parts[1]) : parseInt(parts[0]);
-        }
+        // Logical Resolution Detection (Works for both Normal and Shorts/Vertical)
+        // We pick the shorter side as the quality label (e.g. 1080x1920 -> 1080p)
+        const w = f.width || 0;
+        const h = f.height || 0;
+        const resValue = Math.min(w, h) || h || w;
         
-        if (!h || h < 144) return;
+        if (resValue < 140) return;
         
-        const label = `${h}p`;
+        const label = `${resValue}p`;
         if (!seenLabels.has(label)) {
           seenLabels.add(label);
           qualities.push({
@@ -92,26 +90,24 @@ app.post('/api/info', async (req, res) => {
             format_id: f.format_id,
             ext: 'mp4',
             size: f.filesize || f.filesize_approx || 0,
-            hasAudio: f.acodec !== 'none'
+            hasAudio: f.acodec !== 'none' || f.audio_ext !== 'none'
           });
         }
       });
 
-      // Strict Sorting: 4K (2160p) > 2K (1440p) > 1080p > 720p ...
-      qualities.sort((a, b) => {
-          return parseInt(b.label) - parseInt(a.label);
-      });
+      // Sort by resolution value decending (2160p > 1080p > 720p)
+      qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
 
-      // Improve Audio Info
-      const bestAudio = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none')
-        .sort((a, b) => (b.filesize || b.filesize_approx || 0) - (a.filesize || a.filesize_approx || 0))[0];
+      // Best Audio Logic
+      const audioStreams = rawFormats.filter(f => f.vcodec === 'none' && f.acodec !== 'none');
+      const bestAudio = audioStreams.sort((a, b) => (b.abr || b.tbr || 0) - (a.abr || a.tbr || 0))[0];
 
       const responseData = {
         title: data.title,
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
-        formats: qualities.slice(0, 10), 
+        formats: qualities.slice(0, 15), // Show up to 15 quality options
         audio: { 
             format_id: bestAudio ? bestAudio.format_id : 'bestaudio', 
             ext: 'mp3', 
@@ -122,7 +118,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Formatting data failed." });
+      res.status(500).json({ error: "Analysis Failed: Could not process High-Res data." });
     }
   });
 });
@@ -146,7 +142,7 @@ app.get('/api/download', (req, res) => {
   const ytdlp = spawn(getYTCommand(), args);
   ytdlp.on("close", (code) => {
     if (code !== 0) return res.status(500).send('Download failed');
-    res.download(tempFilePath, `SaveStream_${isAudioOnly ? 'Audio.mp3' : 'Video.mp4'}`, () => {
+    res.download(tempFilePath, `SaveStream_${crypto.randomUUID()}.${ext}`, () => {
       if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
     });
   });
