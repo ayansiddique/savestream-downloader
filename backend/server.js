@@ -13,21 +13,20 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 
-const infoCache = new Map();
 const getYTCommand = () => {
     if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
     return 'yt-dlp';
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Bot Crusher v16.0");
+  res.send("SaveStream Backend Running - Real Error Mode v17.0");
 });
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  // Most resilient clients to bypass "Bot" detection in 2024/2025: android_vr and web_embedded
+  // Ultimate Bypass Strategy: Realistic Android & Web mix
   let args = [
     "--dump-single-json",
     "--no-playlist",
@@ -36,14 +35,12 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    "--extractor-args", "youtube:player_client=android_vr,web_embedded;player_skip=configs",
-    "--add-header", "Accept-Language:en-US,en;q=0.9",
-    "--add-header", "Sec-Fetch-Mode:navigate",
-    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "--extractor-args", "youtube:player_client=android,web;player_skip=configs",
+    "--user-agent", "com.google.android.youtube/19.12.35 (Linux; U; Android 14; en_US; Pixel 7 Pro) Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36",
     url
   ];
 
-  console.log(`[BOT CRUSHER] Deep Extraction: ${url}`);
+  console.log(`[V17 DEBUG] Analyzing: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
@@ -57,12 +54,16 @@ app.post('/api/info', async (req, res) => {
     clearTimeout(timeout);
     if (code !== 0) {
       const errorMsg = stderrData.trim();
-      console.error(`[ERROR] yt-dlp:`, errorMsg);
+      console.error(`[ERROR] Full Log:`, errorMsg);
       
-      let userError = "Analysis Failed: System is temporarily busy. Please try again or use a different video link.";
-      if (errorMsg.includes("confirm you're not a bot")) userError = "Analysis Failed: YouTube is blocking the server. Please wait 1-2 minutes or try another video.";
-      else if (errorMsg.includes("Unavailable")) userError = "Analysis Failed: Video not found or private.";
+      // We will now show the REAL first line of the error to the user for diagnosis
+      let rawError = errorMsg.split('\n')[0].replace("ERROR: ", "").substring(0, 150);
+      let userError = `Analysis Failed: ${rawError || "Connection Timeout"}`;
       
+      if (errorMsg.includes("confirm you're not a bot")) {
+        userError = "Analysis Failed: YouTube Bot Detection is active. Please try again in 5 minutes.";
+      }
+
       return res.status(500).json({ error: userError });
     }
 
@@ -72,6 +73,7 @@ app.post('/api/info', async (req, res) => {
       const seenLabels = new Set();
       const qualities = [];
 
+      // Sort by height to prioritize best quality
       rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
       rawFormats.forEach(f => {
@@ -116,7 +118,7 @@ app.post('/api/info', async (req, res) => {
 
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Analysis Failed: Platform protected. Please try later." });
+      res.status(500).json({ error: "Analysis Failed: Data extraction failed. Try another link." });
     }
   });
 });
@@ -131,7 +133,7 @@ app.get('/api/download', (req, res) => {
         ? `${format_id}+bestaudio/best` 
         : "bestvideo+bestaudio/best");
 
-  const tempFilePath = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${isAudioOnly ? 'mp3' : 'mp4'}`);
+  const tempFilePath = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
   
   const args = isAudioOnly 
     ? ["-f", formatArg, "--extract-audio", "--audio-format", "mp3", "--no-check-certificate", "-o", tempFilePath, url]
