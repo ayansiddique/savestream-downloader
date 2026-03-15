@@ -30,7 +30,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Bypass Active");
+  res.send("SaveStream Backend Running - Enhanced Bypass v3.1");
 });
 
 app.get("/api/health", (req, res) => {
@@ -60,7 +60,7 @@ app.post('/api/info', async (req, res) => {
     if (Date.now() - cachedData.timestamp < CACHE_TTL) return res.json(cachedData.data);
   }
 
-  // Advanced Bypass for Data Center IPs (Railway/AWS)
+  // Advanced Bypass: Combining Android client with Web configs to confuse BOT detection
   const args = [
     "--dump-single-json",
     "--no-playlist",
@@ -69,9 +69,8 @@ app.post('/api/info', async (req, res) => {
     "--no-check-certificate",
     "--force-ipv4",
     "--geo-bypass",
-    // Mimic the mobile YouTube player client to bypass "bot" detection
-    "--extractor-args", "youtube:player_client=ios,web",
-    "--add-header", "User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1",
+    "--extractor-args", "youtube:player_client=android,web;player_skip=webpage,configs",
+    "--add-header", "User-Agent:Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
     "--add-header", "Accept-Language:en-US,en;q=0.9",
     url
   ];
@@ -82,7 +81,7 @@ app.post('/api/info', async (req, res) => {
 
   const timeout = setTimeout(() => {
     ytdlp.kill();
-  }, 45000); // Increased timeout for bypass evaluation
+  }, 45000);
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -90,12 +89,17 @@ app.post('/api/info', async (req, res) => {
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      console.error(`[ERROR] Code ${code}:`, stderrData);
+      const cleanError = stderrData.trim();
+      console.error(`[ERROR] Code ${code}:`, cleanError);
       
       let errorMessage = "Analysis Failed";
-      if (stderrData.includes("confirm you're not a bot")) errorMessage = "Analysis Failed: Platform is blocking the request. Try again in a minute.";
-      else if (stderrData.includes("Sign in to confirm your age")) errorMessage = "Analysis Failed: Age restricted video.";
-      else errorMessage = `Analysis Failed: ${stderrData.split('\n')[0].substring(0, 100)}`;
+      if (cleanError.includes("confirm you're not a bot")) {
+        errorMessage = "Analysis Failed: YouTube is blocking this server (Bot detection). Try another link or wait.";
+      } else if (cleanError.includes("Sign in to confirm your age")) {
+        errorMessage = "Analysis Failed: This video is age-restricted.";
+      } else if (cleanError.length > 0) {
+        errorMessage = `Analysis Failed: ${cleanError.split('\n')[0].substring(0, 150)}`;
+      }
 
       return res.status(500).json({ error: errorMessage });
     }
@@ -141,7 +145,7 @@ app.post('/api/info', async (req, res) => {
       infoCache.set(url, { timestamp: Date.now(), data: responseData });
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse video data" });
+      res.status(500).json({ error: "Failed to parse video data. YouTube might have changed its format." });
     }
   });
 });
