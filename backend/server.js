@@ -158,9 +158,19 @@ app.get('/api/download', (req, res) => {
     let active = true;
 
     const cleanup = () => {
-        if (!active) return;
-        active = false;
-        if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
+      if (!active) return;
+      active = false;
+      if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
+    };
+
+    const onComplete = () => {
+      cleanup();
+      activeDownloads--;
+      if (downloadQueue.length > 0) {
+        const next = downloadQueue.shift();
+        activeDownloads++;
+        next();
+      }
     };
 
     try {
@@ -174,21 +184,18 @@ app.get('/api/download', (req, res) => {
         if (err) {
             console.error('Download exec error:', err.message);
             if (!res.headersSent) res.status(500).send('Download failed');
+            onComplete();
             return;
         }
-        res.download(tempFilePath, isAudioOnly ? 'audio.mp3' : 'video.mp4', () => {
-            cleanup();
-            activeDownloads--;
-            if (downloadQueue.length > 0) {
-                const next = downloadQueue.shift();
-                activeDownloads++;
-                next();
-            }
+        res.download(tempFilePath, isAudioOnly ? 'audio.mp3' : 'video.mp4', (err) => {
+            if (err) console.error('Stream error:', err.message);
+            onComplete();
         });
       });
 
     } catch (e) {
-      cleanup();
+      console.error('Download catch error:', e.message);
+      onComplete();
     }
   };
 
