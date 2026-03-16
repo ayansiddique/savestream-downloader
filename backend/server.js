@@ -19,7 +19,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream Backend Running - Multi-Core Bypass v26.0 (Live)");
+  res.send("SaveStream Backend Running - Stable Power v27.0 (Live)");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -35,33 +35,31 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--geo-bypass",
+    "--geo-bypass-country", "US",
     "--force-ipv4"
   ];
 
-  // Advanced Routing Logic v26.0
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    // Using embedded and mobile clients for maximum geo-bypass
-    args.push("--extractor-args", "youtube:player_client=mweb,ios,web;player_skip=configs");
+    // Reverting to the most stable client combo for standard & restricted videos
+    args.push("--extractor-args", "youtube:player_client=android,ios,web;player_skip=configs");
     args.push("--add-header", `X-Forwarded-For:${randomIP}`);
-    args.push("--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1");
+    args.push("--add-header", "Accept-Language:en-US,en;q=0.9");
+    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   } else if (url.includes('instagram.com') || url.includes('facebook.com')) {
-    // Desktop UA often works better for social media scrapers on servers
     args.push("--add-header", "Referer:https://www.instagram.com/");
-    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
-  } else if (url.includes('reddit.com')) {
-    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+    args.push("--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1");
   } else {
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   }
 
   args.push(url);
 
-  console.log(`[V26 MULTI-CORE] Fetching: ${url}`);
+  console.log(`[V27 STABLE] Extraction for: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
   
   let stdoutData = "";
   let stderrData = "";
-  const timeout = setTimeout(() => { ytdlp.kill(); }, 55000);
+  const timeout = setTimeout(() => { ytdlp.kill(); }, 60000);
 
   ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
   ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
@@ -71,15 +69,13 @@ app.post('/api/info', async (req, res) => {
     if (code !== 0) {
       const errorMsg = stderrData.trim();
       let userError = "Analysis Failed";
-      
       if (errorMsg.includes("country") || errorMsg.includes("available")) {
-         userError = "Analysis Failed: Video is strictly protected in this region. Try another link.";
-      } else if (errorMsg.includes("login") || errorMsg.includes("sign in")) {
-         userError = "Analysis Failed: Login required by platform. Try a public link.";
+         userError = "Analysis Failed: This video is heavily protected by YouTube. Please try another video link.";
+      } else if (errorMsg.includes("bot")) {
+         userError = "Analysis Failed: Server busy. Please wait 1 minute.";
       } else {
-         userError = "Analysis Failed: Platform is temporarily busy. Please refresh.";
+         userError = `Analysis Failed: Platform restricted.`;
       }
-
       return res.status(500).json({ error: userError });
     }
 
@@ -93,12 +89,9 @@ app.post('/api/info', async (req, res) => {
         if (f.vcodec === 'none' || !f.vcodec) return;
         const resVal = Math.min(f.width || 0, f.height || 0) || f.height || f.width || 0;
         
-        // Sorting and labeling
-        let label = "Video";
-        if (resVal >= 1080) label = "1080p Full HD";
-        else if (resVal >= 720) label = "720p HD";
-        else if (resVal >= 480) label = "480p SD";
-        else if (resVal > 0) label = `${resVal}p`;
+        // Simple, Clean Labeling (Fixing "karab" buttons)
+        if (resVal < 140) return;
+        let label = `${resVal}p`;
 
         if (!seenLabels.has(label)) {
           seenLabels.add(label);
@@ -111,15 +104,16 @@ app.post('/api/info', async (req, res) => {
         }
       });
 
-      // Special fallback if no specific resolutions were listed
+      // Fallback for Insta/Facebook/Reddit
       if (qualities.length === 0) {
-        qualities.push({ label: "Best MP4 Quality", format_id: "best", ext: "mp4", size: 0 });
+        qualities.push({ label: "High Quality", format_id: "best", ext: "mp4", size: 0 });
       }
 
+      // Strict Sorting: 1080p > 720p > 480p ...
       qualities.sort((a, b) => (parseInt(b.label) || 0) - (parseInt(a.label) || 0));
 
       const responseData = {
-        title: data.title || "Social Media Video",
+        title: data.title || "Social Video",
         thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
         duration: data.duration,
         extractor: data.extractor,
@@ -129,7 +123,7 @@ app.post('/api/info', async (req, res) => {
 
       res.json(responseData);
     } catch (e) {
-      res.status(500).json({ error: "High extraction load. Please try again." });
+      res.status(500).json({ error: "Analysis error. Try again." });
     }
   });
 });
@@ -143,6 +137,7 @@ app.get('/api/download', (req, res) => {
   const args = [
     "-f", formatArg,
     "--no-check-certificate",
+    "--geo-bypass",
     "-o", tempFilePath,
     url
   ];
