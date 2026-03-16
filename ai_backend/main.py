@@ -26,44 +26,62 @@ class ChatRequest(BaseModel):
 def read_root():
     return {"status": "SaveStream AI server running"}
 
+# Simple state to track WhatsApp link inclusion (in a real app, this would be per session)
+whatsapp_count = 0
+
 def get_ai_response(text: str) -> str:
     """
-    Intelligent response logic for the SaveStream Downloader assistant.
-    Includes regular help and troubleshooting tips.
+    Advanced response logic for SaveStream AI Assistant.
+    Supports Roman Urdu/Hindi and English. 
+    Includes step-by-step instructions and smart link inclusion.
     """
+    global whatsapp_count
     msg = text.lower()
     
-    # Greetings
-    if "hello" in msg or "hi" in msg or "hey" in msg:
-        return "Hello there! I am your SaveStream AI Assistant. How can I help you with downloading today?"
-        
-    # Download instructions
-    elif "how" in msg and "download" in msg:
-        return "It's easy! \n1. Copy the video URL.\n2. Paste it into the input box.\n3. Click 'Fetch Video'.\n4. Choose MP4 (Video) or MP3 (Audio).\n5. Click Download!"
-        
-    # Supported formats (MP3/MP4)
-    elif "mp3" in msg or "audio" in msg or "music" in msg:
-        return "Yes, you can extract and download high-quality MP3 audio from videos. Just click the 'Audio (.mp3)' tab after fetching the video."
+    # WhatsApp Logic Setup
+    whatsapp_link = "https://whatsapp.com/channel/0029VbCLfMP5fM5Qug9m0S0c"
+    whatsapp_promo = f"\n\nFor updates, you can also join our WhatsApp channel: {whatsapp_link}"
     
-    elif "mp4" in msg or "video" in msg or "format" in msg:
-        return "We support MP4 video downloads in various qualities, from 360p up to 1080p Full HD!"
+    # Decide whether to show WhatsApp link (Shown every 3rd message or on relevant questions)
+    show_promo = False
+    whatsapp_count += 1
+    if whatsapp_count % 3 == 0:
+        show_promo = True
 
-    # Allowed platforms
-    elif "platform" in msg or "youtube" in msg or "tiktok" in msg or "instagram" in msg or "facebook" in msg:
-        return "SaveStream Downloader supports over 1000+ platforms including YouTube, TikTok, Instagram, Reddit, Facebook, and Twitter."
+    # 1. Greetings
+    if any(word in msg for word in ["hello", "hi", "hey", "asalam", "namaste"]):
+        resp = "Hello! I am your SaveStream AI Assistant. I can help you download videos step-by-step. How can I assist you today?"
+        return resp + (whatsapp_promo if show_promo else "")
 
-    # Pricing
-    elif "cost" in msg or "free" in msg or "pay" in msg:
-        return "SaveStream is a 100% free tool! No payments, no hidden fees, and no installation required."
+    # 2. Main Download Instructions (Multilingual)
+    elif any(phrase in msg for phrase in ["how to download", "download kaise", "kaise kare", "step", "tarika", "tareeka", "downloading process"]):
+        resp = ("To download a video, please follow these steps:\n"
+                "1. Copy the video URL from any platform.\n"
+                "2. Paste it into the input box on our homepage.\n"
+                "3. Click the 'Fetch Video' button.\n"
+                "4. Choose your preferred format: MP4 (Video) or MP3 (Audio).\n"
+                "5. Click 'Download' to save the file.")
+        # Always prioritize WhatsApp link for the main "How-to" question if it hasn't been shown much
+        return resp + whatsapp_promo if (show_promo or whatsapp_count < 2) else resp
 
-    # Troubleshooting & Errors
-    elif "not downloading" in msg or "error" in msg or "failed" in msg or "doesn't work" in msg:
-        return "I'm sorry you are having trouble. Here are a few possible causes:\n- The video might be private or region-locked.\n- The platform might be temporarily blocking requests.\n- The link might be incorrect.\n\nTry refreshing the page or testing a different video link!"
-        
-    elif "slow" in msg or "stuck" in msg:
-        return "If the download is slow, it might be due to server load or network speed. Try pausing and resuming, or check your internet connection."
+    # 3. MP3 / Audio Converting
+    elif any(word in msg for word in ["mp3", "audio", "convert", "music", "gana", "gaana"]):
+        resp = ("Yes! You can definitely download MP3. Just paste your link, click 'Fetch Video', and then select the 'Audio (.mp3)' tab before clicking Download.")
+        return resp
 
-    # Out of scope fallback
+    # 4. Troubleshooting (Why not working?)
+    elif any(phrase in msg for phrase in ["not working", "error", "failed", "download nahi", "masla", "problem", "nahi ho raha"]):
+        return ("If your video is not downloading, please check:\n"
+                "- Is the video public? (Private videos cannot be downloaded)\n"
+                "- Is the link correct?\n"
+                "- Is the platform supported?\n"
+                "Try refreshing the page or using a different browser. If the issue persists, the server might be temporary busy.")
+
+    # 5. Platforms & Features
+    elif any(word in msg for word in ["platform", "sites", "youtube", "tiktok", "insta", "facebook", "twitter", "free", "cost"]):
+        return ("SaveStream supports 1000+ platforms including YouTube, TikTok, and Instagram. It is 100% free with no installation required!")
+
+    # 6. Unrelated questions
     else:
         return "I can only answer questions related to SaveStream Downloader. Check the suggested questions or ask me how to download!"
 
