@@ -62,24 +62,18 @@ app.post('/api/info', async (req, res) => {
   const isTikTok = url.includes('tiktok.com');
   const isInsta = url.includes('instagram.com') || url.includes('facebook.com');
 
-  // Build platform-specific args
+  // Clean connection - IP spoofing often triggers strict bot checks on DC IPs
   const commonArgs = [
-    "--add-header", `X-Forwarded-For:${randomIP()}`,
     "--add-header", "Accept-Language:en-US,en;q=0.9"
   ];
 
   const youtubeClientSets = [
-    // Attempt 1 — proven stable config
-    ["--extractor-args", "youtube:player_client=mweb,android_vr;player_skip=configs",
-     "--user-agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36"],
-    // Attempt 2 — fallback with different IP
-    ["--extractor-args", "youtube:player_client=android,mweb;player_skip=configs",
-     "--add-header", `X-Forwarded-For:${randomIP()}`,
-     "--user-agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36"],
-    // Attempt 3 — last resort ios
-    ["--extractor-args", "youtube:player_client=ios;player_skip=configs",
-     "--add-header", `X-Forwarded-For:${randomIP()}`,
-     "--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"]
+    // Attempt 1 — Let yt-dlp use its default internal bypass mechanisms
+    [],
+    // Attempt 2 — iOS with clean connection
+    ["--extractor-args", "youtube:player_client=ios;player_skip=configs"],
+    // Attempt 3 — Android VR with clean connection
+    ["--extractor-args", "youtube:player_client=android_vr;player_skip=configs"]
   ];
 
   const socialArgs = isTikTok
