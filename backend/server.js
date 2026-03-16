@@ -19,7 +19,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream v31.0 - Stable Core (Live)");
+  res.send("SaveStream v32.0 - Embedded Client Engine (Live)");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -35,15 +35,15 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--geo-bypass",
-    "--force-ipv4",
-    "--add-header", `X-Forwarded-For:${randomIP}`,
-    "--add-header", "Accept-Language:en-US,en;q=0.9"
+    "--force-ipv4"
   ];
 
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    // android_vr is the most stable client for datacenter servers
-    args.push("--extractor-args", "youtube:player_client=android_vr,web;player_skip=configs");
-    args.push("--user-agent", "com.google.android.apps.youtube.vr.oculus/1.57.29 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
+    // web_embedded and tv_embedded bypass bot detection on datacenter IPs in 2025
+    args.push("--extractor-args", "youtube:player_client=web_embedded,tv_embedded;player_skip=configs,webpage");
+    args.push("--add-header", `X-Forwarded-For:${randomIP}`);
+    args.push("--add-header", "Accept-Language:en-US,en;q=0.9");
+    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   } else if (url.includes('tiktok.com')) {
     args.push("--add-header", "Referer:https://www.tiktok.com/");
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
@@ -56,7 +56,7 @@ app.post('/api/info', async (req, res) => {
 
   args.push(url);
 
-  console.log(`[V31 STABLE] Analyzing: ${url}`);
+  console.log(`[V32] Analyzing: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
 
   let stdoutData = "";
@@ -72,11 +72,11 @@ app.post('/api/info', async (req, res) => {
       const err = stderrData.trim();
       let msg;
       if (err.includes("bot") || err.includes("sign in")) {
-        msg = "Analysis Failed: YouTube bot check failed. Please try again in a few seconds.";
+        msg = "Analysis Failed: YouTube server is temporarily busy. Please try again.";
       } else if (err.includes("country") || err.includes("not available")) {
-        msg = "Analysis Failed: This video is region-locked and cannot be downloaded.";
+        msg = "Analysis Failed: This video is region-restricted.";
       } else if (err.includes("private") || err.includes("login")) {
-        msg = "Analysis Failed: This video is private or requires login.";
+        msg = "Analysis Failed: This video is private.";
       } else {
         msg = "Analysis Failed: Could not fetch video. Try a different link.";
       }
@@ -144,7 +144,9 @@ app.post('/api/info', async (req, res) => {
 app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
   const isAudio = ext === 'mp3';
-  const fmt = isAudio ? "bestaudio/best" : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "bestvideo+bestaudio/best");
+  const fmt = isAudio
+    ? "bestaudio/best"
+    : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "bestvideo+bestaudio/best");
   const out = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
 
   const args = ["-f", fmt, "--no-check-certificate", "--geo-bypass", "-o", out];
@@ -167,5 +169,5 @@ app.get('/api/download', (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`SaveStream v31 running on port ${PORT}`);
+  console.log(`SaveStream v32 running on port ${PORT}`);
 });
