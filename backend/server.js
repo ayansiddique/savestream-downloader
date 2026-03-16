@@ -19,7 +19,7 @@ const getYTCommand = () => {
 };
 
 app.get("/", (req, res) => {
-  res.send("SaveStream v32.0 - Embedded Client Engine (Live)");
+  res.send("SaveStream v33.0 - Proven Stable (Live)");
 });
 
 app.post('/api/info', async (req, res) => {
@@ -35,15 +35,15 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--geo-bypass",
-    "--force-ipv4"
+    "--force-ipv4",
+    "--add-header", `X-Forwarded-For:${randomIP}`,
+    "--add-header", "Accept-Language:en-US,en;q=0.9"
   ];
 
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    // web_embedded and tv_embedded bypass bot detection on datacenter IPs in 2025
-    args.push("--extractor-args", "youtube:player_client=web_embedded,tv_embedded;player_skip=configs,webpage");
-    args.push("--add-header", `X-Forwarded-For:${randomIP}`);
-    args.push("--add-header", "Accept-Language:en-US,en;q=0.9");
-    args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
+    // This exact config was working well in v18-v20
+    args.push("--extractor-args", "youtube:player_client=mweb,android_vr;player_skip=configs");
+    args.push("--user-agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36");
   } else if (url.includes('tiktok.com')) {
     args.push("--add-header", "Referer:https://www.tiktok.com/");
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
@@ -56,7 +56,7 @@ app.post('/api/info', async (req, res) => {
 
   args.push(url);
 
-  console.log(`[V32] Analyzing: ${url}`);
+  console.log(`[V33 PROVEN] Analyzing: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
 
   let stdoutData = "";
@@ -72,13 +72,13 @@ app.post('/api/info', async (req, res) => {
       const err = stderrData.trim();
       let msg;
       if (err.includes("bot") || err.includes("sign in")) {
-        msg = "Analysis Failed: YouTube server is temporarily busy. Please try again.";
+        msg = "Analysis Failed: YouTube is temporarily blocking the server. Try again in 30 seconds.";
       } else if (err.includes("country") || err.includes("not available")) {
-        msg = "Analysis Failed: This video is region-restricted.";
+        msg = "Analysis Failed: This video is region-restricted in your country.";
       } else if (err.includes("private") || err.includes("login")) {
         msg = "Analysis Failed: This video is private.";
       } else {
-        msg = "Analysis Failed: Could not fetch video. Try a different link.";
+        msg = "Analysis Failed: Could not load this video. Try a different link.";
       }
       return res.status(500).json({ error: msg });
     }
@@ -93,8 +93,8 @@ app.post('/api/info', async (req, res) => {
         if (!f.vcodec || f.vcodec === 'none') return;
         const h = f.height || 0;
         const w = f.width || 0;
-        const resVal = Math.min(w, h) || h || w;
-        if (resVal < 140) return;
+        const resVal = Math.min(w || 9999, h || 9999) === 9999 ? (h || w) : Math.min(w, h);
+        if (!resVal || resVal < 140) return;
 
         let label = `${resVal}p`;
         if (resVal >= 1080) label = "1080p HD";
@@ -169,5 +169,5 @@ app.get('/api/download', (req, res) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`SaveStream v32 running on port ${PORT}`);
+  console.log(`SaveStream v33 running on port ${PORT}`);
 });
