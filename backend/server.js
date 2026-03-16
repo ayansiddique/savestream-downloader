@@ -162,9 +162,13 @@ app.post('/api/info', async (req, res) => {
       .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
       .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
+    const bestThumbnail = (data.thumbnails && data.thumbnails.length > 0)
+      ? data.thumbnails[data.thumbnails.length - 1].url
+      : data.thumbnail;
+
     res.json({
       title: data.title || "Video",
-      thumbnail: data.thumbnail || data.thumbnails?.[0]?.url,
+      thumbnail: bestThumbnail,
       duration: data.duration,
       extractor: data.extractor,
       formats: qualities.slice(0, 10),
@@ -172,6 +176,26 @@ app.post('/api/info', async (req, res) => {
     });
   } catch (e) {
     res.status(500).json({ error: "Failed to parse video info. Please try again." });
+  }
+});
+
+// Thumbnail download proxy (forces file download instead of browser open)
+app.get('/api/download-thumbnail', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).send('URL required');
+  try {
+    const https = require('https');
+    const http = require('http');
+    const protocol = url.startsWith('https') ? https : http;
+    protocol.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (imgRes) => {
+      const contentType = imgRes.headers['content-type'] || 'image/jpeg';
+      const ext = contentType.includes('png') ? 'png' : 'jpg';
+      res.setHeader('Content-Disposition', `attachment; filename="thumbnail.${ext}"`);
+      res.setHeader('Content-Type', contentType);
+      imgRes.pipe(res);
+    }).on('error', () => res.status(500).send('Failed to fetch thumbnail'));
+  } catch (e) {
+    res.status(500).send('Thumbnail download failed');
   }
 });
 

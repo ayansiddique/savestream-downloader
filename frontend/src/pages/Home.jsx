@@ -211,7 +211,7 @@ export default function Home() {
                     </div>
                     <button 
                       className="download-btn"
-                      onClick={() => window.open(videoInfo.thumbnail, '_blank')}
+                      onClick={() => window.location.href = `${API_BASE}/download-thumbnail?url=${encodeURIComponent(videoInfo.thumbnail)}`}
                     >
                       <Download size={18} />
                       Download Thumbnail
