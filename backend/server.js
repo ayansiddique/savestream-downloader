@@ -18,35 +18,15 @@ const getYTCommand = () => {
     return 'yt-dlp';
 };
 
-// Cookie file path (uploaded by admin via env or file)
-const COOKIE_FILE = path.join(__dirname, 'cookies', 'youtube.txt');
-const hasCookies = () => fs.existsSync(COOKIE_FILE) && fs.statSync(COOKIE_FILE).size > 100;
-
 app.get("/", (req, res) => {
-  res.send(`SaveStream v30.0 (Live) | Cookies: ${hasCookies() ? 'Active ✅' : 'Not Set ⚠️'}`);
-});
-
-// Cookie upload endpoint (Admin only, protected by env secret)
-app.post('/api/admin/upload-cookies', express.text({ limit: '5mb', type: '*/*' }), (req, res) => {
-    const authHeader = req.headers['x-admin-key'];
-    const expectedKey = process.env.ADMIN_KEY || 'savestream_admin_2025';
-    if (authHeader !== expectedKey) return res.status(401).json({ error: 'Unauthorized' });
-
-    try {
-        const cookieDir = path.join(__dirname, 'cookies');
-        if (!fs.existsSync(cookieDir)) fs.mkdirSync(cookieDir, { recursive: true });
-        fs.writeFileSync(COOKIE_FILE, req.body);
-        res.json({ success: true, message: `Cookie file saved (${req.body.length} bytes)` });
-    } catch (e) {
-        res.status(500).json({ error: 'Failed to save cookie file' });
-    }
+  res.send("SaveStream v31.0 - Stable Core (Live)");
 });
 
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  const randomIP = `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+  const randomIP = `${Math.floor(Math.random()*200+10)}.${Math.floor(Math.random()*200+10)}.${Math.floor(Math.random()*200+10)}.${Math.floor(Math.random()*200+10)}`;
 
   let args = [
     "--dump-single-json",
@@ -55,69 +35,72 @@ app.post('/api/info', async (req, res) => {
     "--skip-download",
     "--no-check-certificate",
     "--geo-bypass",
-    "--force-ipv4"
+    "--force-ipv4",
+    "--add-header", `X-Forwarded-For:${randomIP}`,
+    "--add-header", "Accept-Language:en-US,en;q=0.9"
   ];
 
-  // Use cookies if available (THE PERMANENT FIX)
-  if (hasCookies()) {
-    args.push("--cookies", COOKIE_FILE);
-    console.log("[V30] Using cookie-based auth for extraction");
-  }
-
   if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    args.push("--extractor-args", "youtube:player_client=android,ios;player_skip=configs");
-    args.push("--add-header", `X-Forwarded-For:${randomIP}`);
+    // android_vr is the most stable client for datacenter servers
+    args.push("--extractor-args", "youtube:player_client=android_vr,web;player_skip=configs");
+    args.push("--user-agent", "com.google.android.apps.youtube.vr.oculus/1.57.29 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip");
+  } else if (url.includes('tiktok.com')) {
+    args.push("--add-header", "Referer:https://www.tiktok.com/");
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   } else if (url.includes('instagram.com') || url.includes('facebook.com')) {
     args.push("--add-header", "Referer:https://www.instagram.com/");
-    args.push("--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1");
+    args.push("--user-agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1");
   } else {
     args.push("--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36");
   }
 
   args.push(url);
 
-  console.log(`[V30] Analyzing: ${url}`);
+  console.log(`[V31 STABLE] Analyzing: ${url}`);
   const ytdlp = spawn(getYTCommand(), args);
 
   let stdoutData = "";
   let stderrData = "";
-  const timeout = setTimeout(() => { ytdlp.kill(); }, 60000);
+  const timeout = setTimeout(() => { ytdlp.kill(); }, 55000);
 
-  ytdlp.stdout.on("data", (chunk) => { stdoutData += chunk.toString(); });
-  ytdlp.stderr.on("data", (chunk) => { stderrData += chunk.toString(); });
+  ytdlp.stdout.on("data", (d) => { stdoutData += d.toString(); });
+  ytdlp.stderr.on("data", (d) => { stderrData += d.toString(); });
 
   ytdlp.on("close", (code) => {
     clearTimeout(timeout);
     if (code !== 0) {
-      const errorMsg = stderrData.trim();
-      let userError;
-      if (errorMsg.includes("bot") || errorMsg.includes("sign in")) {
-        userError = hasCookies()
-          ? "Analysis Failed: Cookie expired. Please refresh cookies."
-          : "Analysis Failed: YouTube requires authentication. Admin must upload cookies.";
-      } else if (errorMsg.includes("country") || errorMsg.includes("available")) {
-        userError = "Analysis Failed: Video is region-restricted.";
+      const err = stderrData.trim();
+      let msg;
+      if (err.includes("bot") || err.includes("sign in")) {
+        msg = "Analysis Failed: YouTube bot check failed. Please try again in a few seconds.";
+      } else if (err.includes("country") || err.includes("not available")) {
+        msg = "Analysis Failed: This video is region-locked and cannot be downloaded.";
+      } else if (err.includes("private") || err.includes("login")) {
+        msg = "Analysis Failed: This video is private or requires login.";
       } else {
-        userError = "Analysis Failed: Platform is temporarily protected. Try again.";
+        msg = "Analysis Failed: Could not fetch video. Try a different link.";
       }
-      return res.status(500).json({ error: userError });
+      return res.status(500).json({ error: msg });
     }
 
     try {
       const data = JSON.parse(stdoutData || '{}');
       const rawFormats = data.formats || [];
       const seenLabels = new Set();
-      let qualities = [];
+      const qualities = [];
 
       rawFormats.forEach(f => {
-        if (f.vcodec === 'none' || !f.vcodec) return;
-        const resVal = Math.min(f.width || 0, f.height || 0) || f.height || f.width || 0;
+        if (!f.vcodec || f.vcodec === 'none') return;
+        const h = f.height || 0;
+        const w = f.width || 0;
+        const resVal = Math.min(w, h) || h || w;
         if (resVal < 140) return;
 
         let label = `${resVal}p`;
-        if (resVal >= 1080) label = "1080p Full HD";
+        if (resVal >= 1080) label = "1080p HD";
         else if (resVal >= 720) label = "720p HD";
+        else if (resVal >= 480) label = "480p";
+        else if (resVal >= 360) label = "360p";
 
         if (!seenLabels.has(label)) {
           seenLabels.add(label);
@@ -134,34 +117,39 @@ app.post('/api/info', async (req, res) => {
         qualities.push({ label: "Best Quality", format_id: "best", ext: "mp4", size: 0 });
       }
 
-      qualities.sort((a, b) => (parseInt(b.label) || 0) - (parseInt(a.label) || 0));
+      qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
+
+      const bestAudio = rawFormats
+        .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
+        .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
       res.json({
         title: data.title || "Video",
-        thumbnail: data.thumbnail || (data.thumbnails?.[0]?.url),
+        thumbnail: data.thumbnail || data.thumbnails?.[0]?.url,
         duration: data.duration,
         extractor: data.extractor,
         formats: qualities.slice(0, 10),
-        audio: { format_id: 'bestaudio', ext: 'mp3' }
+        audio: {
+          format_id: bestAudio?.format_id || 'bestaudio',
+          ext: 'mp3',
+          size: bestAudio?.filesize || bestAudio?.filesize_approx || 0
+        }
       });
     } catch (e) {
-      res.status(500).json({ error: "Failed to parse video info." });
+      res.status(500).json({ error: "Failed to parse video info. Please try again." });
     }
   });
 });
 
 app.get('/api/download', (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
-  const isAudioOnly = ext === 'mp3';
-  const formatArg = isAudioOnly ? "bestaudio/best" : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "best");
-  const tempFilePath = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
+  const isAudio = ext === 'mp3';
+  const fmt = isAudio ? "bestaudio/best" : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "bestvideo+bestaudio/best");
+  const out = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
 
-  const args = ["-f", formatArg, "--no-check-certificate", "--geo-bypass", "-o", tempFilePath];
+  const args = ["-f", fmt, "--no-check-certificate", "--geo-bypass", "-o", out];
 
-  // Use cookies for download too if available
-  if (hasCookies()) args.push("--cookies", COOKIE_FILE);
-
-  if (!isAudioOnly) {
+  if (!isAudio) {
     args.push("--merge-output-format", "mp4", "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k");
   } else {
     args.push("--extract-audio", "--audio-format", "mp3");
@@ -171,13 +159,13 @@ app.get('/api/download', (req, res) => {
 
   const ytdlp = spawn(getYTCommand(), args);
   ytdlp.on("close", (code) => {
-    if (code !== 0) return res.status(500).send('Download failed');
-    res.download(tempFilePath, `savestream_media.${ext}`, () => {
-      if (fs.existsSync(tempFilePath)) fs.unlink(tempFilePath, () => {});
+    if (code !== 0) return res.status(500).send("Download failed. Please try again.");
+    res.download(out, `savestream.${ext}`, () => {
+      if (fs.existsSync(out)) fs.unlink(out, () => {});
     });
   });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT} | Cookies: ${hasCookies() ? 'Active' : 'Not Set'}`);
+  console.log(`SaveStream v31 running on port ${PORT}`);
 });
