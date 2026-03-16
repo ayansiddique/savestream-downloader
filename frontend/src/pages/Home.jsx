@@ -154,6 +154,12 @@ export default function Home() {
                     Audio (.mp3)
                   </button>
                 )}
+                <button 
+                  className={`tab ${activeTab === 'thumbnail' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('thumbnail')}
+                >
+                  Thumbnail
+                </button>
               </div>
 
               <div className="quality-list">
@@ -163,21 +169,21 @@ export default function Home() {
                       <div className="quality-info">
                         <span className="quality-label">
                           {format.label} 
-                          <span className="tag">{format.ext.toUpperCase()}</span>
+                          <span className="tag">MP4</span>
                         </span>
                         <span className="quality-size">{formatBytes(format.size)}</span>
                       </div>
                       <button 
                         className="download-btn"
                         disabled={downloadingFormat === format.format_id}
-                        onClick={() => handleDownload(format.format_id, format.ext)}
+                        onClick={() => handleDownload(format.format_id, 'mp4')}
                       >
                         <Download size={18} />
                         Download
                       </button>
                     </div>
                   ))
-                ) : (
+                ) : activeTab === 'audio' ? (
                   <div className="quality-card">
                     <div className="quality-info">
                       <span className="quality-label">
@@ -192,6 +198,23 @@ export default function Home() {
                     >
                       <Download size={18} />
                       Download
+                    </button>
+                  </div>
+                ) : (
+                  <div className="quality-card thumbnail-tab-content">
+                    <div className="quality-info">
+                      <span className="quality-label">
+                        High Quality 
+                        <span className="tag">JPG</span>
+                      </span>
+                      <span className="quality-size">Original Image</span>
+                    </div>
+                    <button 
+                      className="download-btn"
+                      onClick={() => window.open(videoInfo.thumbnail, '_blank')}
+                    >
+                      <Download size={18} />
+                      Download Thumbnail
                     </button>
                   </div>
                 )}
