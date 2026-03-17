@@ -56,34 +56,38 @@ def get_ai_response(text: str) -> str:
         resp = "Assalam-o-Alaikum! Hello! I am your SaveStream AI Assistant. 🚀\n\nI can help you download videos step-by-step from 1000+ sites like YouTube, TikTok, and Instagram. How can I assist you today?"
         return resp + whatsapp_promo
 
-    # 2. Main Download Instructions
-    elif any(w in words for w in ["download", "downloading", "how", "kaise", "step", "tarika", "tareeka", "method", "load", "video"]):
-        resp = ("✅ **Video Download Karne Ka Tarika:**\n"
-                "1. Kisi bhi video ka link copy karein.\n"
-                "2. Homepage par box mein paste karein.\n"
-                "3. 'Fetch Video' button par click karein.\n"
-                "4. MP4 (Video) ya MP3 (Audio) select karein.\n"
-                "5. 'Download' par click karke save karein.\n\n"
-                "**Premium Feature:** Ab aap HD Thumbnails bhi download kar sakte hain! 🖼️")
-        return resp + whatsapp_promo
-
-    # 3. MP3 / Audio
-    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song", "awaz"]):
-        resp = ("🎵 **MP3 Downloads:**\n"
-                "Yes! Aap kisi bhi video ko MP3 mein convert kar sakte hain. Bas 'Fetch Video' ke baad 'Audio (.mp3)' tab select karein.")
-        return resp + whatsapp_promo
-
-    # 4. Thumbnails & Quality
+    # 2. Thumbnails & Quality (SPECIFIC - Check before general download)
     elif any(w in words for w in ["thumbnail", "image", "pic", "photo", "png", "jpg", "hd", "blur", "quality"]):
         resp = ("🖼️ **HD Thumbnails:**\n"
                 "Humne naya feature add kiya hai! \n"
-                "1. Video fetch karein.\n"
+                "1. Video ka link paste karke fetch karein.\n"
                 "2. 'Thumbnail' tab par jayein.\n"
                 "3. 'High Quality JPG' ya 'Lossless PNG' choose karein.\n"
-                "Wapis blurry images ka masla hal ho gaya hai! ✅")
+                "Ab aap High Definition thumbnails asani se download kar sakte hain! ✅")
         return resp + whatsapp_promo
 
-    # 5. Social Links / Contact
+    # 3. MP3 / Audio (SPECIFIC - Check before general download)
+    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song", "awaz"]):
+        resp = ("🎵 **MP3 Downloads:**\n"
+                "Yes! Aap kisi bhi video ko MP3 (Audio) mein convert kar sakte hain.\n"
+                "Video fetch karne ke baad 'Audio (.mp3)' tab select karein aur download button dabayein.")
+        return resp + whatsapp_promo
+
+    # 4. Features / Pages / About 
+    elif any(w in words for w in ["feature", "features", "pages", "page", "website", "details", "function", "kaam", "about"]):
+        resp = ("✨ **SaveStream Features:**\n"
+                "- **Multi-Platform:** YouTube, Facebook, TikTok (No Watermark), Instagram, aur 1000+ sites.\n"
+                "- **High Quality:** 4K/1080p Support.\n"
+                "- **Audio:** Video to MP3 Conversion.\n"
+                "- **Thumbnails:** HD Quality options (JPG/PNG).\n"
+                "- **Pages:** Hamare paas **Home**, **Why Choose Us**, aur **FAQ** pages hain.")
+        return resp + whatsapp_promo
+
+    # 5. Platforms
+    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt", "fb", "insta"]):
+        return ("SaveStream 100% free hai! ✨\nHum YouTube, TikTok (without watermark), Instagram Reels, aur 1000+ zyada websites support karte hain.") + whatsapp_promo
+
+    # 6. Social Links / Contact
     elif any(w in words for w in ["social", "whatsapp", "facebook", "insta", "contact", "link", "channel", "fb", "instagram", "number", "group"]):
         resp = (f"SaveStream se jurray rehne ke liye niche diye gaye links check karein: 📱\n"
                 f"✅ WhatsApp Channel: {whatsapp_link}\n"
@@ -91,21 +95,27 @@ def get_ai_response(text: str) -> str:
                 f"✅ Instagram Page: https://instagram.com/SaveStream_official")
         return resp
 
-    # 6. Troubleshooting
+    # 7. Troubleshooting
     elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi", "ruk", "reha", "issue"]):
         return ("🛠️ **Troubleshooting Tips:**\n"
-                "- Video ka link 'Public' hona chahiye.\n"
+                "- Link 'Public' hona chahiye.\n"
                 "- Check karein ke URL bilkul sahi hai.\n"
                 "- Page ko refresh karke dobara koshish karein.\n"
-                "- Agar AI jawab na de, toh check karein ke backend running hai.") + whatsapp_promo
+                "- Check karein ke internet connection sahi ho.") + whatsapp_promo
 
-    # 7. Platforms
-    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt", "fb", "insta"]):
-        return ("SaveStream 100% free hai! ✨\nHum YouTube, TikTok (without watermark), Instagram Reels, aur 1000+ zyada websites support karte hain.") + whatsapp_promo
+    # 8. Main Download Instructions (GENERAL - If nothing else matches)
+    elif any(w in words for w in ["download", "downloading", "how", "kaise", "step", "tarika", "tareeka", "method", "load", "video"]):
+        resp = ("✅ **Video Download Karne Ka Tarika:**\n"
+                "1. Video ka link copy karke box mein paste karein.\n"
+                "2. 'Fetch Video' par click karein.\n"
+                "3. Tab (Video, Audio, ya Thumbnail) select karein.\n"
+                "4. Download button par click karein.\n\n"
+                "Ji hamari website se downloads bohat asan hain! 🚀")
+        return resp + whatsapp_promo
 
-    # 6. Unrelated questions
+    # Fallback
     else:
-        return "I can only answer questions related to SaveStream Downloader. Check the suggested questions or ask me how to download!"
+        return "I am your SaveStream Assistant. I can help with Downloads, MP3, HD Thumbnails, and troubleshooting. Ask me 'How to download' or about 'Features'!"
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
