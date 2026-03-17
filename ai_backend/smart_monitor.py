@@ -63,7 +63,7 @@ def main():
                     try: process.terminate()
                     except: pass
                 process = start_ai_server()
-                time.sleep(8) 
+                time.sleep(15) # Wait longer for uvicorn to bind
                 continue
 
             # If online, parse health data

@@ -88,16 +88,12 @@ app.post('/api/info', async (req, res) => {
   ];
 
   const youtubeClientSets = [
-    // Attempt 1 — Default
+    // Attempt 1 — Default (Fastest)
     [],
-    // Attempt 2 — iOS
+    // Attempt 2 — iOS (Best for Bypass)
     ["--extractor-args", "youtube:player_client=ios;player_skip=configs"],
-    // Attempt 3 — Web
-    ["--extractor-args", "youtube:player_client=web;player_skip=configs"],
-    // Attempt 4 — Android
-    ["--extractor-args", "youtube:player_client=android;player_skip=configs"],
-    // Attempt 5 — Android VR
-    ["--extractor-args", "youtube:player_client=android_vr;player_skip=configs"]
+    // Attempt 3 — Android (Reliable Fallback)
+    ["--extractor-args", "youtube:player_client=android;player_skip=configs"]
   ];
 
   const socialArgs = isTikTok
@@ -112,7 +108,7 @@ app.post('/api/info', async (req, res) => {
   if (isYouTube) {
     for (let i = 0; i < youtubeClientSets.length; i++) {
       try {
-        console.log(`[V34] YT attempt ${i + 1} (${youtubeClientSets[i].join(' ') || 'default'}) for: ${url}`);
+        console.log(`[V34] YT info attempt ${i + 1} for: ${url}`);
         rawJson = await runExtraction(url, [...commonArgs, ...youtubeClientSets[i]]);
         break; // Success
       } catch (e) {
@@ -120,9 +116,8 @@ app.post('/api/info', async (req, res) => {
         const isBot = lastError.includes("bot") || lastError.includes("sign in") || lastError.includes("block");
         if (isBot && i < youtubeClientSets.length - 1) {
           console.warn(`[V34] Block detected on attempt ${i + 1}, trying next client...`);
-          await sleep(1500);
+          // No sleep - just try next client immediately for speed
         } else {
-          // If it's a non-bot error (like private video), don't bother retrying clients
           if (!isBot) break;
         }
       }
@@ -229,25 +224,79 @@ app.get('/api/download-thumbnail', async (req, res) => {
   }
 });
 
-app.get('/api/download', (req, res) => {
+app.get('/api/download', async (req, res) => {
   const { url, format_id, ext = 'mp4' } = req.query;
+  if (!url) return res.status(400).send("URL required");
+
+  const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
   const isAudio = ext === 'mp3';
   const fmt = isAudio
     ? "bestaudio/best"
     : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "bestvideo+bestaudio/best");
+  
   const out = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
+  
+  // Create downloads dir if it doesn't exist (safety)
+  if (!fs.existsSync(path.join(__dirname, 'downloads'))) {
+    fs.mkdirSync(path.join(__dirname, 'downloads'));
+  }
 
-  const args = ["-f", fmt, "--no-check-certificate", "--geo-bypass", "-o", out];
-  if (!isAudio) args.push("--merge-output-format", "mp4", "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k");
-  else args.push("--extract-audio", "--audio-format", "mp3");
+  const args = [
+    "-f", fmt, 
+    "--no-check-certificate", 
+    "--geo-bypass", 
+    "--no-warnings",
+    "-o", out
+  ];
+
+  // YouTube bypass for download
+  if (isYouTube) {
+    args.push("--extractor-args", "youtube:player_client=ios,android;player_skip=configs");
+  }
+
+  if (!isAudio) {
+    args.push("--merge-output-format", "mp4", "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k");
+  } else {
+    args.push("--extract-audio", "--audio-format", "mp3");
+  }
+
   args.push(url);
 
+  console.log(`[V34] Starting download: ${url}`);
+  logStatus(`Download started: ${url}`);
+
   const ytdlp = spawn(getYTCommand(), args);
+  
+  // 20 minute timeout for large files
+  const timeout = setTimeout(() => {
+    console.error("[V34] Download timed out");
+    ytdlp.kill();
+  }, 20 * 60 * 1000);
+
+  ytdlp.stderr.on("data", d => {
+    const err = d.toString();
+    if (err.includes("ERROR") || err.includes("bot") || err.includes("sign message")) {
+      console.error(`[V34] Download Error: ${err}`);
+      logError(`Download failed for ${url}: ${err}`);
+    }
+  });
+
   ytdlp.on("close", code => {
-    if (code !== 0) return res.status(500).send("Download failed. Please try again.");
-    res.download(out, `savestream.${ext}`, () => {
+    clearTimeout(timeout);
+    if (code === 0 && fs.existsSync(out)) {
+      console.log(`[V34] Download finished: ${out}`);
+      res.download(out, `savestream.${ext}`, (err) => {
+        if (err) console.error("Download response error:", err);
+        // Clean up
+        if (fs.existsSync(out)) fs.unlink(out, () => {});
+      });
+    } else {
+      console.error(`[V34] Download failed with code ${code}`);
+      if (!res.headersSent) {
+        res.status(500).send("Download failed. YouTube might be blocking or the file is too large. Please try again.");
+      }
       if (fs.existsSync(out)) fs.unlink(out, () => {});
-    });
+    }
   });
 });
 
