@@ -26,8 +26,11 @@ class ChatRequest(BaseModel):
 def read_root():
     return {"status": "SaveStream AI server running"}
 
-# Simple state to track WhatsApp link inclusion (in a real app, this would be per session)
-whatsapp_count = 0
+# Simple state to track bot metrics
+class BotState:
+    whatsapp_count = 0
+
+state = BotState()
 
 def get_ai_response(text: str) -> str:
     """
@@ -35,7 +38,6 @@ def get_ai_response(text: str) -> str:
     Supports Roman Urdu/Hindi and English. 
     Includes step-by-step instructions and smart link inclusion.
     """
-    global whatsapp_count
     msg = text.lower()
     
     # WhatsApp Logic Setup
@@ -44,20 +46,26 @@ def get_ai_response(text: str) -> str:
     
     # Decide whether to show WhatsApp link (Shown every 3rd message or on relevant questions)
     show_promo = False
-    whatsapp_count += 1
-    if whatsapp_count % 3 == 0:
+    state.whatsapp_count += 1
+    if state.whatsapp_count % 3 == 0:
         show_promo = True
 
-    # Robust keyword matching for Roman Urdu & English
-    words = set(msg.split())
+    # Robust matching: Strip punctuation and check sets
+    import re
+    msg_clean = re.sub(r'[^\w\s]', '', msg)
+    words = set(msg_clean.split())
     
     # 1. Greetings
     if any(w in words for w in ["hello", "hi", "hey", "asalam", "namaste", "aoa", "greetings", "salam"]):
         resp = "Assalam-o-Alaikum! Hello! I am your SaveStream AI Assistant. 🚀\n\nI can help you download videos step-by-step from 1000+ sites like YouTube, TikTok, and Instagram. How can I assist you today?"
         return resp + whatsapp_promo
 
+    # 1.1 Thanks / Shukria
+    elif any(w in words for w in ["thanks", "thank", "shukria", "shukriya", "tysm", "ty", "jazakallah", "welcome", "shuker", "shukr", "meherbani", "meharbani", "thx", "thnk"]):
+        return "You're very welcome! JazakAllah! 😊 Mazeed koi madad chahiye ho toh batayein. Happy downloading with SaveStream! 🚀"
+
     # 2. Thumbnails & Quality (SPECIFIC - Check before general download)
-    elif any(w in words for w in ["thumbnail", "image", "pic", "photo", "png", "jpg", "hd", "blur", "quality"]):
+    elif any(w in words for w in ["thumbnail", "thumbnails", "image", "images", "pic", "photo", "png", "jpg", "hd", "blur", "quality"]):
         resp = ("🖼️ **HD Thumbnails:**\n"
                 "Humne naya feature add kiya hai! \n"
                 "1. Video ka link paste karke fetch karein.\n"
@@ -67,14 +75,14 @@ def get_ai_response(text: str) -> str:
         return resp + whatsapp_promo
 
     # 3. MP3 / Audio (SPECIFIC - Check before general download)
-    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song", "awaz"]):
+    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song", "awaz", "mp3s"]):
         resp = ("🎵 **MP3 Downloads:**\n"
                 "Yes! Aap kisi bhi video ko MP3 (Audio) mein convert kar sakte hain.\n"
                 "Video fetch karne ke baad 'Audio (.mp3)' tab select karein aur download button dabayein.")
         return resp + whatsapp_promo
 
     # 4. Features / Pages / About 
-    elif any(w in words for w in ["feature", "features", "pages", "page", "website", "details", "function", "kaam", "about"]):
+    elif any(w in words for w in ["feature", "features", "pages", "page", "website", "details", "function", "kaam", "about", "list"]):
         resp = ("✨ **SaveStream Features:**\n"
                 "- **Multi-Platform:** YouTube, Facebook, TikTok (No Watermark), Instagram, aur 1000+ sites.\n"
                 "- **High Quality:** 4K/1080p Support.\n"
@@ -83,9 +91,9 @@ def get_ai_response(text: str) -> str:
                 "- **Pages:** Hamare paas **Home**, **Why Choose Us**, aur **FAQ** pages hain.")
         return resp + whatsapp_promo
 
-    # 5. Platforms
-    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt", "fb", "insta"]):
-        return ("SaveStream 100% free hai! ✨\nHum YouTube, TikTok (without watermark), Instagram Reels, aur 1000+ zyada websites support karte hain.") + whatsapp_promo
+    # 5. Platforms / Supported Sites
+    elif any(w in words for w in ["platform", "platforms", "sites", "site", "youtube", "tiktok", "twitter", "free", "cost", "yt", "fb", "insta", "supported", "which"]):
+        return ("SaveStream 100% free hai! ✨\nHum YouTube, TikTok (without watermark), Instagram Reels, aur 1000+ zyada websites support karte hain. Aap kisi bhi public link ko try kar sakte hain!") + whatsapp_promo
 
     # 6. Social Links / Contact
     elif any(w in words for w in ["social", "whatsapp", "facebook", "insta", "contact", "link", "channel", "fb", "instagram", "number", "group"]):
