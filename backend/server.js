@@ -8,6 +8,13 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const SHARED_LOG = path.join(__dirname, '..', 'server.log');
+
+// Log helper for AI consistency 
+const logError = (msg) => {
+    const entry = `[${new Date().toISOString()}] ERROR: ${msg}\n`;
+    fs.appendFileSync(SHARED_LOG, entry);
+};
 
 app.set('trust proxy', 1);
 app.use(cors());
@@ -114,12 +121,16 @@ app.post('/api/info', async (req, res) => {
     let msg;
     if (lastError.includes("bot") || lastError.includes("sign in")) {
       msg = "Analysis Failed: YouTube is temporarily blocking. Please wait 30 seconds and try again.";
+      logError(`YouTube Block detected: ${lastError}`);
     } else if (lastError.includes("country") || lastError.includes("not available")) {
       msg = "Analysis Failed: This video is region-restricted.";
+      logError(`Region Lock: ${lastError}`);
     } else if (lastError.includes("private") || lastError.includes("login")) {
       msg = "Analysis Failed: This video is private or login-protected.";
+      logError(`Privacy Lock: ${lastError}`);
     } else {
       msg = "Analysis Failed: Could not load this video. Try a different link.";
+      logError(`General Extraction Failure: ${lastError}`);
     }
     return res.status(500).json({ error: msg });
   }

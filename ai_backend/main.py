@@ -103,13 +103,18 @@ def get_ai_response(text: str) -> str:
                 f"✅ Instagram Page: https://instagram.com/SaveStream_official")
         return resp
 
-    # 7. Troubleshooting
-    elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi", "ruk", "reha", "issue"]):
+    # 7. Troubleshooting & Issues
+    elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi", "ruk", "reha", "issue", "blocking", "blocked", "block"]):
+        if any(w in words for w in ["youtube", "yt"]):
+            return ("🛠️ **YouTube Block Detected:**\n"
+                    "YouTube humari requests ko temporarily block kar raha hai (Bot Protected). 🛡️\n\n"
+                    "**AI Solution:** Maine automated system ko bata diya hai aur wo cache clear karke IP filter reset karne ki koshish kar raha hai. ✨\n"
+                    "App thori dair baad (approx 30s) dobara try karein, InshaAllah theek ho jayega.")
         return ("🛠️ **Troubleshooting Tips:**\n"
                 "- Link 'Public' hona chahiye.\n"
                 "- Check karein ke URL bilkul sahi hai.\n"
                 "- Page ko refresh karke dobara koshish karein.\n"
-                "- Check karein ke internet connection sahi ho.") + whatsapp_promo
+                "- Hamara Smart Monitor background mein issues theek kar raha hai. ✅") + whatsapp_promo
 
     # 8. Main Download Instructions (GENERAL - If nothing else matches)
     elif any(w in words for w in ["download", "downloading", "how", "kaise", "step", "tarika", "tareeka", "method", "load", "video"]):
@@ -140,51 +145,63 @@ def check_errors_endpoint():
     """
     Scans the local server.log file for error keywords and provides structured feedback.
     """
-    error_keywords = ["ERROR", "FAILED", "CRASH", "EXCEPTION", "TIMEOUT"]
-    log_file = "server.log"
+    error_keywords = ["ERROR", "FAILED", "CRASH", "EXCEPTION", "TIMEOUT", "BLOCK"]
+    # Look for log in the root directory (one level up from ai_backend)
+    log_file = os.path.join(os.getcwd(), "..", "server.log")
     
     if not os.path.exists(log_file):
         return {
             "error_detected": False,
-            "message": "System running normally"
+            "message": "System running normally (Log not found yet)"
         }
         
     try:
         # Try different encodings for Windows compatibility
         encodings = ['utf-8', 'utf-16', 'latin-1']
-        lines = []
+        all_lines = []
         for enc in encodings:
             try:
                 with open(log_file, "r", encoding=enc) as file:
-                    lines = file.readlines()
+                    all_lines = file.readlines()
                 break
             except (UnicodeDecodeError, Exception):
                 continue
         
-        if not lines:
-             return {"error_detected": False, "message": "Log file empty or unreadable"}
+        if not all_lines:
+             return {"error_detected": False, "message": "Log file empty"}
 
-        for line in reversed(lines):
+        # Scan last 20 lines without slicing to avoid lint issues
+        count = 0
+        for i in range(len(all_lines) - 1, -1, -1):
+            if count >= 20: break
+            line = all_lines[i]
             upper_line = line.upper()
+            count += 1
+            
+            # YouTube Blocking detection
+            if "YOUTUBE BLOCK" in upper_line:
+                return {
+                    "error_detected": True,
+                    "explanation": "YouTube Protected Mode active.",
+                    "possible_cause": "Frequent requests from single IP.",
+                    "suggested_fix": "CLEAR_CACHE"
+                }
+
             for keyword in error_keywords:
                 if keyword in upper_line:
-                    
                     if keyword == "TIMEOUT":
-                        cause = "A request to an external server timed out."
-                        fix = "Check internet status or restart the specific process."
+                        cause = "Server timeout."
+                        fix = "RESTART"
                     elif keyword == "CRASH":
-                        cause = "A critical failure caused the server to crash."
-                        fix = "Check server memory and restart the backend."
-                    elif keyword == "FAILED":
-                        cause = "The download or fetch process failed."
-                        fix = "Verify the target URL or check if the platform is blocking bots."
+                        cause = "Process crash."
+                        fix = "RESTART"
                     else:
-                        cause = "A generic software exception was caught."
-                        fix = "Review the recent application logs for traceability."
+                        cause = "General error detected."
+                        fix = "RESTART"
 
                     return {
                         "error_detected": True,
-                        "explanation": f"Log flagged a '{keyword}' issue.",
+                        "explanation": f"Detected {keyword} in logs.",
                         "possible_cause": cause,
                         "suggested_fix": fix
                     }

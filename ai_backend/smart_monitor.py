@@ -60,7 +60,8 @@ def main():
                         log(f"Fixing: Attempting '{data['suggested_fix']}' automatically...")
                         
                         # Auto-Fix Implementation
-                        if "restart" in data['suggested_fix'].lower():
+                        fix_cmd = data['suggested_fix'].upper()
+                        if "RESTART" in fix_cmd:
                             curr_proc = process
                             if curr_proc is not None:
                                 try:
@@ -71,7 +72,16 @@ def main():
                                 time.sleep(2)
                             process = start_ai_server()
                         
-                        log("FIX COMPLETE: System should be stable.")
+                        elif "CLEAR_CACHE" in fix_cmd:
+                            log("AUTO-FIX: Detected YouTube Block. Clearing yt-dlp cache...")
+                            try:
+                                # Run cache clear command
+                                subprocess.run(["yt-dlp", "--rm-cache-dir"], check=True, capture_output=True)
+                                log("CACHE CLEAR: Success. System should be able to retry now.")
+                            except Exception as e:
+                                log(f"CACHE CLEAR: Failed -> {str(e)}")
+
+                        log("FIX ACTION COMPLETE.")
                     else:
                         pass # System is healthy
                 else:
