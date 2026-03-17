@@ -69,13 +69,22 @@ def get_ai_response(text: str) -> str:
         resp = ("Yes! You can definitely download MP3. Just paste your link, click 'Fetch Video', and then select the 'Audio (.mp3)' tab before clicking Download.")
         return resp
 
-    # 4. Troubleshooting (Why not working?)
-    elif any(phrase in msg for phrase in ["not working", "error", "failed", "download nahi", "masla", "problem", "nahi ho raha"]):
-        return ("If your video is not downloading, please check:\n"
-                "- Is the video public? (Private videos cannot be downloaded)\n"
-                "- Is the link correct?\n"
-                "- Is the platform supported?\n"
-                "Try refreshing the page or using a different browser. If the issue persists, the server might be temporary busy.")
+    # 4. Thumbnails & Quality
+    elif any(word in msg for word in ["thumbnail", "image", "pic", "photo", "png", "jpg"]):
+        resp = ("Our new update allows you to download Thumbnails in HD quality!\n"
+                "1. Fetch the video.\n"
+                "2. Go to the 'Thumbnail' tab.\n"
+                "3. Choose 'High Quality JPG' or 'Lossless PNG'.\n"
+                "We automatically select the highest possible resolution from the platform to avoid blurriness.")
+        return resp
+
+    # 5. Troubleshooting (Why not working?)
+    elif any(phrase in msg for phrase in ["not working", "error", "failed", "download nahi", "masla", "problem", "nahi ho raha", "connection"]):
+        return ("If you see a Connection Error, please ensure the Python AI Backend is running on your server.\n"
+                "For download issues:\n"
+                "- Private videos cannot be downloaded.\n"
+                "- Check if the URL is correct.\n"
+                "- Refresh the page and try again.")
 
     # 5. Platforms & Features
     elif any(word in msg for word in ["platform", "sites", "youtube", "tiktok", "insta", "facebook", "twitter", "free", "cost"]):

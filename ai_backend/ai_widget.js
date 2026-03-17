@@ -295,6 +295,7 @@
     function appendMessage(text, isAI) {
         const msgDiv = document.createElement('div');
         msgDiv.className = isAI ? 'ai-msg' : 'user-msg';
+        msgDiv.textContent = text; // Set the content!
         
         // Hide smart suggestions once the conversation actually starts
         if (!isAI && suggestionsDiv) {
