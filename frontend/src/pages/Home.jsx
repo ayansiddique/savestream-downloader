@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://savestream-downloader-production-43ee.up.railway.app/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
 
 export default function Home() {
   const [url, setUrl] = useState('');

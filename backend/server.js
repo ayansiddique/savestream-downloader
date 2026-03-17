@@ -139,16 +139,16 @@ app.post('/api/info', async (req, res) => {
     let msg;
     if (lastError.includes("bot") || lastError.includes("sign in")) {
       msg = "Analysis Failed: YouTube is temporarily blocking. Please wait 30 seconds and try again.";
-      logError(`YouTube Block detected: ${lastError}`);
+      logError(`YouTube Block detected for ${url}. Error: ${lastError}`);
     } else if (lastError.includes("country") || lastError.includes("not available")) {
       msg = "Analysis Failed: This video is region-restricted.";
-      logError(`Region Lock: ${lastError}`);
+      logError(`Region Lock for ${url}. Error: ${lastError}`);
     } else if (lastError.includes("private") || lastError.includes("login")) {
       msg = "Analysis Failed: This video is private or login-protected.";
-      logError(`Privacy Lock: ${lastError}`);
+      logError(`Privacy Lock for ${url}. Error: ${lastError}`);
     } else {
       msg = "Analysis Failed: Could not load this video. Try a different link.";
-      logError(`General Extraction Failure: ${lastError}`);
+      logError(`General Extraction Failure for ${url}. Error: ${lastError}`);
     }
     return res.status(500).json({ error: msg });
   }
