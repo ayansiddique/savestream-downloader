@@ -48,60 +48,60 @@ def get_ai_response(text: str) -> str:
     if whatsapp_count % 3 == 0:
         show_promo = True
 
-    # Decouple words for more robust matching
+    # Robust keyword matching for Roman Urdu & English
     words = set(msg.split())
     
     # 1. Greetings
-    if any(w in words for w in ["hello", "hi", "hey", "asalam", "namaste", "aoa", "greetings"]):
-        resp = "Hello! I am your SaveStream AI Assistant. I can help you download videos step-by-step from 1000+ platforms including YouTube, Instagram, and TikTok. How can I assist you today?"
+    if any(w in words for w in ["hello", "hi", "hey", "asalam", "namaste", "aoa", "greetings", "salam"]):
+        resp = "Assalam-o-Alaikum! Hello! I am your SaveStream AI Assistant. 🚀\n\nI can help you download videos step-by-step from 1000+ sites like YouTube, TikTok, and Instagram. How can I assist you today?"
         return resp + whatsapp_promo
 
-    # 2. Main Download Instructions (Multilingual)
-    elif any(w in words for w in ["download", "how", "kaise", "step", "tarika", "tareeka", "method", "proses", "process"]):
-        resp = ("🚀 **How to Download:**\n"
-                "1. Copy the video link from any site.\n"
-                "2. Paste it in the box on our homepage.\n"
-                "3. Click 'Fetch Video'.\n"
-                "4. Select MP4 (Video) or MP3 (Audio).\n"
-                "5. Click 'Download'.\n\n"
-                "**New Feature:** You can also download HD Thumbnails (JPG/PNG) in the 'Thumbnail' tab!")
+    # 2. Main Download Instructions
+    elif any(w in words for w in ["download", "downloading", "how", "kaise", "step", "tarika", "tareeka", "method", "load", "video"]):
+        resp = ("✅ **Video Download Karne Ka Tarika:**\n"
+                "1. Kisi bhi video ka link copy karein.\n"
+                "2. Homepage par box mein paste karein.\n"
+                "3. 'Fetch Video' button par click karein.\n"
+                "4. MP4 (Video) ya MP3 (Audio) select karein.\n"
+                "5. 'Download' par click karke save karein.\n\n"
+                "**Premium Feature:** Ab aap HD Thumbnails bhi download kar sakte hain! 🖼️")
         return resp + whatsapp_promo
 
-    # 3. MP3 / Audio Converting
-    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song"]):
+    # 3. MP3 / Audio
+    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song", "awaz"]):
         resp = ("🎵 **MP3 Downloads:**\n"
-                "Yes! You can convert any video to high-quality MP3. Just fetch the video and go to the 'Audio (.mp3)' tab.")
+                "Yes! Aap kisi bhi video ko MP3 mein convert kar sakte hain. Bas 'Fetch Video' ke baad 'Audio (.mp3)' tab select karein.")
         return resp + whatsapp_promo
 
-    # 4. Thumbnails & Quality (JPG/PNG)
-    elif any(w in words for w in ["thumbnail", "image", "pic", "photo", "png", "jpg", "hd", "blur"]):
+    # 4. Thumbnails & Quality
+    elif any(w in words for w in ["thumbnail", "image", "pic", "photo", "png", "jpg", "hd", "blur", "quality"]):
         resp = ("🖼️ **HD Thumbnails:**\n"
-                "We recently added a high-quality thumbnail feature! \n"
-                "1. Fetch your video.\n"
-                "2. Click the 'Thumbnail' tab.\n"
-                "3. You'll see options for 'High Quality JPG' and 'Lossless PNG'.\n"
-                "We automatically pick the highest resolution to ensure it's never blurry!")
+                "Humne naya feature add kiya hai! \n"
+                "1. Video fetch karein.\n"
+                "2. 'Thumbnail' tab par jayein.\n"
+                "3. 'High Quality JPG' ya 'Lossless PNG' choose karein.\n"
+                "Wapis blurry images ka masla hal ho gaya hai! ✅")
         return resp + whatsapp_promo
 
     # 5. Social Links / Contact
-    elif any(w in words for w in ["social", "whatsapp", "facebook", "insta", "contact", "link", "channel", "fb", "instagram"]):
-        resp = (f"Stay connected with us for the latest updates!\n"
-                f"📱 WhatsApp: {whatsapp_link}\n"
-                f"📘 Facebook: https://facebook.com/SaveStream\n"
-                f"📸 Instagram: https://instagram.com/SaveStream_official")
+    elif any(w in words for w in ["social", "whatsapp", "facebook", "insta", "contact", "link", "channel", "fb", "instagram", "number", "group"]):
+        resp = (f"SaveStream se jurray rehne ke liye niche diye gaye links check karein: 📱\n"
+                f"✅ WhatsApp Channel: {whatsapp_link}\n"
+                f"✅ Facebook Official: https://facebook.com/SaveStream\n"
+                f"✅ Instagram Page: https://instagram.com/SaveStream_official")
         return resp
 
     # 6. Troubleshooting
-    elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi"]):
-        return ("🛠️ **Troubleshooting:**\n"
-                "- Ensure the video is public (not private).\n"
-                "- Check if the URL is correct.\n"
-                "- If using a mobile, try refreshing the page.\n"
-                "- Connection Error? Make sure our Python AI Backend is running.") + whatsapp_promo
+    elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi", "ruk", "reha", "issue"]):
+        return ("🛠️ **Troubleshooting Tips:**\n"
+                "- Video ka link 'Public' hona chahiye.\n"
+                "- Check karein ke URL bilkul sahi hai.\n"
+                "- Page ko refresh karke dobara koshish karein.\n"
+                "- Agar AI jawab na de, toh check karein ke backend running hai.") + whatsapp_promo
 
-    # 7. Platforms & Features
-    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt"]):
-        return ("SaveStream is 100% free and supports 1000+ sites including YouTube, TikTok (without watermark), and Instagram Reels!") + whatsapp_promo
+    # 7. Platforms
+    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt", "fb", "insta"]):
+        return ("SaveStream 100% free hai! ✨\nHum YouTube, TikTok (without watermark), Instagram Reels, aur 1000+ zyada websites support karte hain.") + whatsapp_promo
 
     # 6. Unrelated questions
     else:
