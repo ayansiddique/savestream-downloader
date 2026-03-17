@@ -8,12 +8,25 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const SHARED_LOG = 'c:\\Users\\786\\Pictures\\free vedio downloader\\server.log';
+const ROOT_DIR = 'c:\\Users\\786\\Pictures\\free vedio downloader';
+const SHARED_LOG = path.join(ROOT_DIR, 'ai_backend', 'server.log');
+const YT_BINARY = path.join(ROOT_DIR, 'backend', 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe');
 
 // Log helper for AI consistency 
 const logError = (msg) => {
-    const entry = `[${new Date().toISOString()}] ERROR: ${msg}\n`;
-    fs.appendFileSync(SHARED_LOG, entry);
+    try {
+        const entry = `[${new Date().toISOString()}] ERROR: ${msg}\n`;
+        fs.appendFileSync(SHARED_LOG, entry);
+    } catch (e) {
+        console.error("Failed to write to log:", e);
+    }
+};
+
+const logStatus = (msg) => {
+    try {
+        const entry = `[${new Date().toISOString()}] STATUS: ${msg}\n`;
+        fs.appendFileSync(SHARED_LOG, entry);
+    } catch (e) {}
 };
 
 app.set('trust proxy', 1);
@@ -21,7 +34,7 @@ app.use(cors());
 app.use(express.json());
 
 const getYTCommand = () => {
-    if (fs.existsSync('/usr/local/bin/yt-dlp')) return '/usr/local/bin/yt-dlp';
+    if (fs.existsSync(YT_BINARY)) return YT_BINARY;
     return 'yt-dlp';
 };
 
@@ -238,4 +251,7 @@ app.get('/api/download', (req, res) => {
   });
 });
 
-app.listen(PORT, "0.0.0.0", () => console.log(`SaveStream v34 on port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`SaveStream v34 on port ${PORT}`);
+    logStatus("SYSTEM_INITIALIZED: Backend is online and ready.");
+});

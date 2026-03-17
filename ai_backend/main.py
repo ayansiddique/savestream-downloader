@@ -146,7 +146,7 @@ def check_errors_endpoint():
     Scans the local server.log file for error keywords and provides structured feedback.
     """
     error_keywords = ["ERROR", "FAILED", "CRASH", "EXCEPTION", "TIMEOUT", "BLOCK"]
-    log_file = r"c:\Users\786\Pictures\free vedio downloader\server.log"
+    log_file = r"c:\Users\786\Pictures\free vedio downloader\ai_backend\server.log"
     
     if not os.path.exists(log_file):
         return {
