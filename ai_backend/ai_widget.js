@@ -111,10 +111,11 @@
 
         .user-msg {
             background: linear-gradient(135deg, #c471ed, #f64f59);
-            color: white;
+            color: #ffffff !important;
             align-self: flex-end;
             border-bottom-right-radius: 4px;
             box-shadow: 0 4px 6px -1px rgba(246, 79, 89, 0.2);
+            font-weight: 500;
         }
 
         /* Typing Indicator */
@@ -248,8 +249,8 @@
             <!-- Smart Suggestions -->
             <div class="suggestions-container" id="ai-suggestions">
                 <button class="suggestion-btn">How do I download a video?</button>
-                <button class="suggestion-btn">Can I download MP3?</button>
-                <button class="suggestion-btn">Video not downloading</button>
+                <button class="suggestion-btn">HD quality thumbnails kaise download karein?</button>
+                <button class="suggestion-btn">What platforms are supported?</button>
             </div>
             
             <div class="typing-indicator" id="ai-typing">AI is typing...</div>

@@ -48,47 +48,60 @@ def get_ai_response(text: str) -> str:
     if whatsapp_count % 3 == 0:
         show_promo = True
 
+    # Decouple words for more robust matching
+    words = set(msg.split())
+    
     # 1. Greetings
-    if any(word in msg for word in ["hello", "hi", "hey", "asalam", "namaste"]):
-        resp = "Hello! I am your SaveStream AI Assistant. I can help you download videos step-by-step. How can I assist you today?"
-        return resp + (whatsapp_promo if show_promo else "")
+    if any(w in words for w in ["hello", "hi", "hey", "asalam", "namaste", "aoa", "greetings"]):
+        resp = "Hello! I am your SaveStream AI Assistant. I can help you download videos step-by-step from 1000+ platforms including YouTube, Instagram, and TikTok. How can I assist you today?"
+        return resp + whatsapp_promo
 
     # 2. Main Download Instructions (Multilingual)
-    elif any(phrase in msg for phrase in ["how to download", "download kaise", "kaise kare", "step", "tarika", "tareeka", "downloading process"]):
-        resp = ("To download a video, please follow these steps:\n"
-                "1. Copy the video URL from any platform.\n"
-                "2. Paste it into the input box on our homepage.\n"
-                "3. Click the 'Fetch Video' button.\n"
-                "4. Choose your preferred format: MP4 (Video) or MP3 (Audio).\n"
-                "5. Click 'Download' to save the file.")
-        # Always prioritize WhatsApp link for the main "How-to" question if it hasn't been shown much
-        return resp + whatsapp_promo if (show_promo or whatsapp_count < 2) else resp
+    elif any(w in words for w in ["download", "how", "kaise", "step", "tarika", "tareeka", "method", "proses", "process"]):
+        resp = ("🚀 **How to Download:**\n"
+                "1. Copy the video link from any site.\n"
+                "2. Paste it in the box on our homepage.\n"
+                "3. Click 'Fetch Video'.\n"
+                "4. Select MP4 (Video) or MP3 (Audio).\n"
+                "5. Click 'Download'.\n\n"
+                "**New Feature:** You can also download HD Thumbnails (JPG/PNG) in the 'Thumbnail' tab!")
+        return resp + whatsapp_promo
 
     # 3. MP3 / Audio Converting
-    elif any(word in msg for word in ["mp3", "audio", "convert", "music", "gana", "gaana"]):
-        resp = ("Yes! You can definitely download MP3. Just paste your link, click 'Fetch Video', and then select the 'Audio (.mp3)' tab before clicking Download.")
+    elif any(w in words for w in ["mp3", "audio", "convert", "music", "gana", "gaana", "song"]):
+        resp = ("🎵 **MP3 Downloads:**\n"
+                "Yes! You can convert any video to high-quality MP3. Just fetch the video and go to the 'Audio (.mp3)' tab.")
+        return resp + whatsapp_promo
+
+    # 4. Thumbnails & Quality (JPG/PNG)
+    elif any(w in words for w in ["thumbnail", "image", "pic", "photo", "png", "jpg", "hd", "blur"]):
+        resp = ("🖼️ **HD Thumbnails:**\n"
+                "We recently added a high-quality thumbnail feature! \n"
+                "1. Fetch your video.\n"
+                "2. Click the 'Thumbnail' tab.\n"
+                "3. You'll see options for 'High Quality JPG' and 'Lossless PNG'.\n"
+                "We automatically pick the highest resolution to ensure it's never blurry!")
+        return resp + whatsapp_promo
+
+    # 5. Social Links / Contact
+    elif any(w in words for w in ["social", "whatsapp", "facebook", "insta", "contact", "link", "channel", "fb", "instagram"]):
+        resp = (f"Stay connected with us for the latest updates!\n"
+                f"📱 WhatsApp: {whatsapp_link}\n"
+                f"📘 Facebook: https://facebook.com/SaveStream\n"
+                f"📸 Instagram: https://instagram.com/SaveStream_official")
         return resp
 
-    # 4. Thumbnails & Quality
-    elif any(word in msg for word in ["thumbnail", "image", "pic", "photo", "png", "jpg"]):
-        resp = ("Our new update allows you to download Thumbnails in HD quality!\n"
-                "1. Fetch the video.\n"
-                "2. Go to the 'Thumbnail' tab.\n"
-                "3. Choose 'High Quality JPG' or 'Lossless PNG'.\n"
-                "We automatically select the highest possible resolution from the platform to avoid blurriness.")
-        return resp
-
-    # 5. Troubleshooting (Why not working?)
-    elif any(phrase in msg for phrase in ["not working", "error", "failed", "download nahi", "masla", "problem", "nahi ho raha", "connection"]):
-        return ("If you see a Connection Error, please ensure the Python AI Backend is running on your server.\n"
-                "For download issues:\n"
-                "- Private videos cannot be downloaded.\n"
+    # 6. Troubleshooting
+    elif any(w in words for w in ["error", "failed", "working", "masla", "problem", "connection", "nahi"]):
+        return ("🛠️ **Troubleshooting:**\n"
+                "- Ensure the video is public (not private).\n"
                 "- Check if the URL is correct.\n"
-                "- Refresh the page and try again.")
+                "- If using a mobile, try refreshing the page.\n"
+                "- Connection Error? Make sure our Python AI Backend is running.") + whatsapp_promo
 
-    # 5. Platforms & Features
-    elif any(word in msg for word in ["platform", "sites", "youtube", "tiktok", "insta", "facebook", "twitter", "free", "cost"]):
-        return ("SaveStream supports 1000+ platforms including YouTube, TikTok, and Instagram. It is 100% free with no installation required!")
+    # 7. Platforms & Features
+    elif any(w in words for w in ["platform", "sites", "youtube", "tiktok", "twitter", "free", "cost", "yt"]):
+        return ("SaveStream is 100% free and supports 1000+ sites including YouTube, TikTok (without watermark), and Instagram Reels!") + whatsapp_promo
 
     # 6. Unrelated questions
     else:
@@ -119,9 +132,20 @@ def check_errors_endpoint():
         }
         
     try:
-        with open(log_file, "r", encoding="utf-8") as file:
-            lines = file.readlines()
-            
+        # Try different encodings for Windows compatibility
+        encodings = ['utf-8', 'utf-16', 'latin-1']
+        lines = []
+        for enc in encodings:
+            try:
+                with open(log_file, "r", encoding=enc) as file:
+                    lines = file.readlines()
+                break
+            except (UnicodeDecodeError, Exception):
+                continue
+        
+        if not lines:
+             return {"error_detected": False, "message": "Log file empty or unreadable"}
+
         for line in reversed(lines):
             upper_line = line.upper()
             for keyword in error_keywords:
