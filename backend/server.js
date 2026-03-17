@@ -156,9 +156,16 @@ app.post('/api/info', async (req, res) => {
       .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
       .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
-    const bestThumbnail = (data.thumbnails && data.thumbnails.length > 0)
-      ? data.thumbnails[data.thumbnails.length - 1].url
-      : data.thumbnail;
+    // Enhanced Thumbnail Selection (find largest)
+    let bestThumbnail = data.thumbnail;
+    if (data.thumbnails && data.thumbnails.length > 0) {
+      const sortedThumbs = [...data.thumbnails].sort((a, b) => {
+        const areaA = (a.width || 0) * (a.height || 0);
+        const areaB = (b.width || 0) * (b.height || 0);
+        return areaB - areaA;
+      });
+      bestThumbnail = sortedThumbs[0].url;
+    }
 
     res.json({
       title: data.title || "Video",

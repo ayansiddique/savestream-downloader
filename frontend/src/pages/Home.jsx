@@ -201,21 +201,44 @@ export default function Home() {
                     </button>
                   </div>
                 ) : (
-                  <div className="quality-card thumbnail-tab-content">
-                    <div className="quality-info">
-                      <span className="quality-label">
-                        High Quality 
-                        <span className="tag">JPG</span>
-                      </span>
-                      <span className="quality-size">Original Image</span>
+                  <div className="thumbnail-options" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    {/* High Quality JPG */}
+                    <div className="quality-card" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+                      <div className="quality-info">
+                        <span className="quality-label">
+                          High Quality
+                          <span className="tag" style={{ backgroundColor: '#ff9800' }}>JPG</span>
+                        </span>
+                        <span className="quality-size">Original Image</span>
+                      </div>
+                      <button 
+                        className="download-btn"
+                        style={{ width: '100%', background: 'linear-gradient(135deg, #6366f1, #a855f7)' }}
+                        onClick={() => window.open(`${API_BASE}/download-thumbnail?url=${encodeURIComponent(videoInfo.thumbnail)}`, '_blank')}
+                      >
+                        <Download size={18} />
+                        Download JPG
+                      </button>
                     </div>
-                    <button 
-                      className="download-btn"
-                      onClick={() => window.location.href = `${API_BASE}/download-thumbnail?url=${encodeURIComponent(videoInfo.thumbnail)}`}
-                    >
-                      <Download size={18} />
-                      Download Thumbnail
-                    </button>
+
+                    {/* High Quality PNG */}
+                    <div className="quality-card" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
+                      <div className="quality-info">
+                        <span className="quality-label">
+                          Lossless
+                          <span className="tag" style={{ backgroundColor: '#4caf50' }}>PNG</span>
+                        </span>
+                        <span className="quality-size">HD Precision</span>
+                      </div>
+                      <button 
+                        className="download-btn"
+                        style={{ width: '100%', background: 'linear-gradient(135deg, #f43f5e, #fb923c)' }}
+                        onClick={() => window.open(`${API_BASE}/download-thumbnail?url=${encodeURIComponent(videoInfo.thumbnail)}`, '_blank')}
+                      >
+                        <Download size={18} />
+                        Download PNG
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
