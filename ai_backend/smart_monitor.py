@@ -12,9 +12,10 @@ if sys.platform == "win32":
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 # Configuration
+BASE_DIR = r"c:\Users\786\Pictures\free vedio downloader"
 AI_SERVER_COMMAND = ["python", "-m", "uvicorn", "main:app", "--port", "8000", "--host", "127.0.0.1"]
 AI_SERVER_URL = "http://127.0.0.1:8000/check-errors"
-LOG_FILE = "monitor.log"
+LOG_FILE = os.path.join(BASE_DIR, "ai_backend", "monitor.log")
 
 def log(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -22,7 +23,7 @@ def log(message):
     try:
         print(entry)
     except:
-        print(entry.encode('ascii', 'ignore').decode('ascii'))
+        pass
         
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(entry + "\n")
@@ -33,8 +34,9 @@ def is_port_in_use(port):
 
 def start_ai_server():
     log("Starting SaveStream AI Server...")
-    # Run uvicorn in a separate process
-    process = subprocess.Popen(AI_SERVER_COMMAND, cwd=os.getcwd())
+    # Use shell=True for Windows compatibility
+    ai_dir = os.path.join(BASE_DIR, "ai_backend")
+    process = subprocess.Popen(AI_SERVER_COMMAND, cwd=ai_dir, shell=True)
     return process
 
 def main():

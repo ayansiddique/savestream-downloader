@@ -8,7 +8,7 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const SHARED_LOG = path.join(__dirname, '..', 'server.log');
+const SHARED_LOG = 'c:\\Users\\786\\Pictures\\free vedio downloader\\server.log';
 
 // Log helper for AI consistency 
 const logError = (msg) => {
@@ -75,11 +75,15 @@ app.post('/api/info', async (req, res) => {
   ];
 
   const youtubeClientSets = [
-    // Attempt 1 — Let yt-dlp use its default internal bypass mechanisms
+    // Attempt 1 — Default
     [],
-    // Attempt 2 — iOS with clean connection
+    // Attempt 2 — iOS
     ["--extractor-args", "youtube:player_client=ios;player_skip=configs"],
-    // Attempt 3 — Android VR with clean connection
+    // Attempt 3 — Web
+    ["--extractor-args", "youtube:player_client=web;player_skip=configs"],
+    // Attempt 4 — Android
+    ["--extractor-args", "youtube:player_client=android;player_skip=configs"],
+    // Attempt 5 — Android VR
     ["--extractor-args", "youtube:player_client=android_vr;player_skip=configs"]
   ];
 
@@ -95,17 +99,18 @@ app.post('/api/info', async (req, res) => {
   if (isYouTube) {
     for (let i = 0; i < youtubeClientSets.length; i++) {
       try {
-        console.log(`[V34] YT attempt ${i + 1} for: ${url}`);
+        console.log(`[V34] YT attempt ${i + 1} (${youtubeClientSets[i].join(' ') || 'default'}) for: ${url}`);
         rawJson = await runExtraction(url, [...commonArgs, ...youtubeClientSets[i]]);
         break; // Success
       } catch (e) {
         lastError = e.message;
-        const isBot = lastError.includes("bot") || lastError.includes("sign in");
+        const isBot = lastError.includes("bot") || lastError.includes("sign in") || lastError.includes("block");
         if (isBot && i < youtubeClientSets.length - 1) {
-          console.warn(`[V34] Bot detected on attempt ${i + 1}, retrying in 2s...`);
-          await sleep(2000);
+          console.warn(`[V34] Block detected on attempt ${i + 1}, trying next client...`);
+          await sleep(1500);
         } else {
-          break;
+          // If it's a non-bot error (like private video), don't bother retrying clients
+          if (!isBot) break;
         }
       }
     }
