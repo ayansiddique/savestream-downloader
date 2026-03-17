@@ -307,11 +307,35 @@
         chatWindow.style.display = 'none';
     });
 
+    // Helper: Parse links and bold text
+    function formatMessage(text) {
+        if (!text) return "";
+        // 1. Escape HTML to prevent XSS (minimal)
+        let safe = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        
+        // 2. Bold text **text**
+        safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong style="color: #ffffff;">$1</strong>');
+        
+        // 3. URLs to clickable links
+        const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+        safe = safe.replace(urlRegex, function(url) {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #10b981; text-decoration: underline; font-weight: 600;">$url</a>`.replace('$url', url);
+        });
+
+        // 4. Line breaks
+        return safe.replace(/\n/g, "<br>");
+    }
+
     // Helper: Append a completely styled message bubble
     function appendMessage(text, isAI) {
         const msgDiv = document.createElement('div');
         msgDiv.className = isAI ? 'ai-msg' : 'user-msg';
-        msgDiv.textContent = text; // Set the content!
+        
+        if (!isAI) {
+            msgDiv.textContent = text;
+        } else {
+            msgDiv.innerHTML = formatMessage(text);
+        }
         
         // Hide smart suggestions once the conversation actually starts
         if (!isAI && suggestionsDiv) {
@@ -326,13 +350,16 @@
     }
 
     // Helper: Live Typing Effect (Letter by Letter)
-    async function typeMessage(element, text, speed = 15) {
+    async function typeMessage(element, text, speed = 10) {
         element.textContent = "";
         for (let i = 0; i < text.length; i++) {
             element.textContent += text.charAt(i);
-            chatBox.scrollTop = chatBox.scrollHeight; // Keep scrolling down
+            chatBox.scrollTop = chatBox.scrollHeight;
             await new Promise(r => setTimeout(r, speed));
         }
+        // At the end, swap text with formatted HTML
+        element.innerHTML = formatMessage(text);
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     // Core Send Function
