@@ -150,42 +150,70 @@ app.post('/api/info', async (req, res) => {
 
   try {
     const data = JSON.parse(rawJson || '{}');
+    const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
     const rawFormats = data.formats || [];
-    const seenLabels = new Set();
+    
+    // Better Quality Selection
     const qualities = [];
+    const seenHeights = new Set();
+    
+    // Sort formats: best video quality first
+    const sortedFormats = rawFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
 
-    rawFormats.forEach(f => {
+    sortedFormats.forEach(f => {
       if (!f.vcodec || f.vcodec === 'none') return;
       const h = f.height || 0;
-      const w = f.width || 0;
-      const resVal = (w && h) ? Math.min(w, h) : (h || w);
-      if (!resVal || resVal < 140) return;
+      if (h < 140 || seenHeights.has(h)) return;
+      
+      seenHeights.add(h);
+      let label = `${h}p`;
+      if (h >= 1080) label += " HD";
+      else if (h >= 720) label += " HD";
 
-      let label = `${resVal}p`;
-      if (resVal >= 1080) label = "1080p HD";
-      else if (resVal >= 720) label = "720p HD";
-      else if (resVal >= 480) label = "480p";
-      else if (resVal >= 360) label = "360p";
+      // Calculate total size estimate (Video + Approx Audio)
+      const audioSize = isYouTube ? 8 * 1024 * 1024 : 0; // Approx 8MB for audio on YT
+      const totalSize = (f.filesize || f.filesize_approx || 0) + (f.acodec !== 'none' ? 0 : audioSize);
 
-      if (!seenLabels.has(label)) {
-        seenLabels.add(label);
-        qualities.push({ label, format_id: f.format_id || 'best', ext: 'mp4', size: f.filesize || f.filesize_approx || 0 });
-      }
+      qualities.push({ 
+        label, 
+        format_id: f.format_id, 
+        ext: 'mp4', 
+        size: totalSize,
+        height: h
+      });
     });
 
-    if (qualities.length === 0) qualities.push({ label: "Best Quality", format_id: "best", ext: "mp4", size: 0 });
-    qualities.sort((a, b) => parseInt(b.label) - parseInt(a.label));
+    // Ensure we have at least something
+    if (qualities.length === 0) {
+        qualities.push({ label: "Best Quality", format_id: "best", ext: "mp4", size: 0 });
+    } else {
+        // Sort final list by resolution descending
+        qualities.sort((a, b) => b.height - a.height);
+    }
 
     const bestAudio = rawFormats
       .filter(f => f.vcodec === 'none' && f.acodec !== 'none')
       .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
 
-    // Enhanced Thumbnail Selection (find largest)
     let bestThumbnail = data.thumbnail;
     if (data.thumbnails && data.thumbnails.length > 0) {
-      const sortedThumbs = [...data.thumbnails].sort((a, b) => {
-        const areaA = (a.width || 0) * (a.height || 0);
-        const areaB = (b.width || 0) * (b.height || 0);
+      // Filter out storyboard images (they are often large but blurry grids)
+      // Also filter out any low-res auto-generated fragments
+      const cleanThumbs = data.thumbnails.filter(t => 
+        !t.url.includes('storyboard') && 
+        !t.url.includes('twimg.com/video_thumb') // Example for Twitter low-res
+      );
+      
+      const listToSort = cleanThumbs.length > 0 ? cleanThumbs : data.thumbnails;
+      
+      // Sort by area, but also check for YouTube high-res markers
+      const sortedThumbs = [...listToSort].sort((a, b) => {
+        // Boost for YouTube maxresdefault
+        const aBoost = a.url.includes('maxresdefault') ? 10000000 : 0;
+        const bBoost = b.url.includes('maxresdefault') ? 10000000 : 0;
+        
+        const areaA = ((a.width || 0) * (a.height || 0)) + aBoost;
+        const areaB = ((b.width || 0) * (b.height || 0)) + bBoost;
         return areaB - areaA;
       });
       bestThumbnail = sortedThumbs[0].url;
@@ -200,6 +228,7 @@ app.post('/api/info', async (req, res) => {
       audio: { format_id: bestAudio?.format_id || 'bestaudio', ext: 'mp3', size: bestAudio?.filesize || 0 }
     });
   } catch (e) {
+    console.error("Info Parse Error:", e);
     res.status(500).json({ error: "Failed to parse video info. Please try again." });
   }
 });
@@ -230,13 +259,19 @@ app.get('/api/download', async (req, res) => {
 
   const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
   const isAudio = ext === 'mp3';
-  const fmt = isAudio
-    ? "bestaudio/best"
-    : (format_id && format_id !== 'best' ? `${format_id}+bestaudio/best` : "bestvideo+bestaudio/best");
+  
+  // Robust Format Selection
+  let fmt = "bestvideo+bestaudio/best";
+  if (isAudio) {
+    fmt = "bestaudio/best";
+  } else if (format_id && format_id !== 'best') {
+    // If YouTube, combine specific video with best audio
+    // We use [ext=m4a] for audio to avoid heavy re-encoding when merging into MP4
+    fmt = isYouTube ? `${format_id}+bestaudio[ext=m4a]/bestaudio/best` : format_id;
+  }
   
   const out = path.join(__dirname, 'downloads', `dl_${crypto.randomUUID()}.${ext}`);
   
-  // Create downloads dir if it doesn't exist (safety)
   if (!fs.existsSync(path.join(__dirname, 'downloads'))) {
     fs.mkdirSync(path.join(__dirname, 'downloads'));
   }
@@ -246,24 +281,26 @@ app.get('/api/download', async (req, res) => {
     "--no-check-certificate", 
     "--geo-bypass", 
     "--no-warnings",
+    "--no-playlist",
     "-o", out
   ];
 
-  // YouTube bypass for download
   if (isYouTube) {
     args.push("--extractor-args", "youtube:player_client=ios,android;player_skip=configs");
   }
 
   if (!isAudio) {
-    args.push("--merge-output-format", "mp4", "--postprocessor-args", "ffmpeg:-c:a aac -b:a 192k");
+    args.push("--merge-output-format", "mp4");
+    // Only use heavy postprocessing if strictly needed, otherwise trust yt-dlp merge
+    args.push("--postprocessor-args", "ffmpeg:-c:a aac -b:a 128k");
   } else {
     args.push("--extract-audio", "--audio-format", "mp3");
   }
 
   args.push(url);
 
-  console.log(`[V34] Starting download: ${url}`);
-  logStatus(`Download started: ${url}`);
+  console.log(`[V34] DOWNLOAD CMD: ${getYTCommand()} ${args.join(' ')}`);
+  logStatus(`Download requested: ${url} (Format: ${fmt})`);
 
   const ytdlp = spawn(getYTCommand(), args);
   
