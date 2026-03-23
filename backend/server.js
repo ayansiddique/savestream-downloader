@@ -7,10 +7,12 @@ const fs = require('fs');
 const crypto = require('crypto');
 
 const app = express();
+const os = require('os');
+
 const PORT = process.env.PORT || 8080;
-const ROOT_DIR = 'c:\\Users\\786\\Pictures\\free vedio downloader';
+const ROOT_DIR = path.resolve(__dirname, '..');
 const SHARED_LOG = path.join(ROOT_DIR, 'ai_backend', 'server.log');
-const YT_BINARY = path.join(ROOT_DIR, 'backend', 'node_modules', 'yt-dlp-exec', 'bin', 'yt-dlp.exe');
+const YT_BINARY = path.join(ROOT_DIR, 'backend', 'node_modules', 'yt-dlp-exec', 'bin', os.platform() === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
 
 // Log helper for AI consistency 
 const logError = (msg) => {

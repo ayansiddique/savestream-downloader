@@ -12,7 +12,7 @@ if sys.platform == "win32":
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
 
 # Configuration
-BASE_DIR = r"c:\Users\786\Pictures\free vedio downloader"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 AI_SERVER_COMMAND = ["python", "-m", "uvicorn", "main:app", "--port", "8000", "--host", "127.0.0.1"]
 AI_SERVER_URL = "http://127.0.0.1:8000/check-errors"
 LOG_FILE = os.path.join(BASE_DIR, "ai_backend", "monitor.log")
