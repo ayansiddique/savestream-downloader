@@ -154,11 +154,24 @@ body {
   border: 1px solid var(--card-border);
   border-radius: 24px;
   padding: 2rem;
-  box-shadow: var(--glass-shadow);
-  animation: fadeInUp 0.8s ease-out;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
+  transform-style: preserve-3d;
+  transform: perspective(1000px) rotateX(2deg);
+  animation: fadeInUp 0.8s ease-out, float 6s ease-in-out infinite;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.downloader-card:hover {
+  transform: perspective(1000px) rotateX(0deg) translateY(-5px);
+}
+
+@keyframes float {
+  0% { transform: perspective(1000px) rotateX(2deg) translateY(0px); }
+  50% { transform: perspective(1000px) rotateX(2deg) translateY(-10px); }
+  100% { transform: perspective(1000px) rotateX(2deg) translateY(0px); }
 }
 
 .input-group {
@@ -175,13 +188,14 @@ body {
   border-radius: 16px;
   background-color: var(--input-bg);
   color: var(--text-color);
+  box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.3);
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .url-input:focus {
   outline: none;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+  box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.3), 0 0 0 4px rgba(79, 70, 229, 0.2);
 }
 
 .fetch-btn {
@@ -191,17 +205,24 @@ body {
   border: none;
   border-radius: 16px;
   background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
-  color: var(--button-text);
+  color: white;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 0 var(--primary-hover), 0 10px 20px rgba(0,0,0,0.4);
+  transform: translateY(0);
+  transition: transform 0.1s, box-shadow 0.1s;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .fetch-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -10px var(--primary-color);
+  transform: translateY(2px);
+  box-shadow: 0 4px 0 var(--primary-hover), 0 8px 15px rgba(0,0,0,0.4);
+}
+
+.fetch-btn:active:not(:disabled) {
+  transform: translateY(6px);
+  box-shadow: 0 0 0 var(--primary-hover), 0 4px 10px rgba(0,0,0,0.4);
 }
 
 .fetch-btn:disabled {
@@ -343,11 +364,13 @@ body {
   justify-content: space-between;
   align-items: center;
   transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05);
+  transform-style: preserve-3d;
 }
 
 .quality-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255,255,255,0.1);
   border-color: var(--primary-color);
 }
 
@@ -387,14 +410,22 @@ body {
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  box-shadow: 0 4px 0 var(--primary-hover), 0 5px 10px rgba(0,0,0,0.3);
+  transform: translateY(0);
+  transition: transform 0.1s, box-shadow 0.1s;
   display: flex;
   align-items: center;
   gap: 0.4rem;
 }
 
 .download-btn:hover {
-  background: var(--primary-hover);
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--primary-hover), 0 4px 8px rgba(0,0,0,0.3);
+}
+
+.download-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 0 0 var(--primary-hover), 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .downloading-btn {
